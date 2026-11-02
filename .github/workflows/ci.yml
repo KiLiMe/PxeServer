@@ -1,0 +1,120 @@
+name: ci
+
+# 分支 push / PR 运行轻量的 check job；推送 vX.Y.Z 标签时再跑完整 Windows 构建。
+on:
+  push:
+    branches: ['main', 'master']
+    tags: ['v[0-9]*']
+  pull_request:
+    branches: ['main', 'master']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: gofmt / test -race (internal, linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      # gofmt -l 不空即失败：格式不该靠 review 抓。
+      - name: gofmt
+        shell: bash
+        run: |
+          out="$(gofmt -l .)"
+          if [ -n "$out" ]; then
+            echo "::error::以下文件需要 gofmt："
+            echo "$out"
+            exit 1
+          fi
+
+      - name: go vet
+        shell: bash
+        run: go vet ./internal/...
+
+      # 界面文案的访问器是生成物：catalog 改了没跑 generate 就会不一致。
+      - name: 界面文案一致性
+        shell: bash
+        run: |
+          go tool mygo generate
+          if ! git diff --exit-code -- internal/locales/catalog_gen.go; then
+            echo "::error::catalog_gen.go 与 internal/locales/*.json 不一致，请本地跑 go tool mygo generate 并提交"
+            exit 1
+          fi
+
+      # DHCP / TFTP / HTTP 三个服务都是并发的，竞态检测值得跑。
+      # 只跑 ./internal/...：根包要编 mygo 界面，留给下面的 Windows 那次。
+      - name: go test -race
+        shell: bash
+        run: go test -race -count=1 ./internal/...
+
+  build:
+    name: vet / test / build (windows-amd64)
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: 环境信息
+        shell: pwsh
+        run: |
+          go version
+          pwsh -NoProfile -Command '$PSVersionTable.PSVersion.ToString()'
+
+      - name: go vet
+        shell: pwsh
+        run: go vet ./...
+
+      - name: go test
+        shell: pwsh
+        run: go test -count=1 ./...
+
+      - name: 校验标签格式
+        shell: pwsh
+        run: |
+          $tag = $env:GITHUB_REF_NAME
+          $semver = '^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(-(alpha|beta|rc)(\.\d+)?)?(\+[0-9A-Za-z.-]+)?$'
+          if ($tag -notmatch $semver) {
+            throw "标签应为 vX.Y.Z（可带 -alpha/-beta/-rc 或 +构建信息，例如 v0.1.0、v0.2.0-rc.1），实际：$tag"
+          }
+          Write-Host "版本：$tag"
+
+      - name: 构建 PxeServer.exe（GUI）
+        shell: pwsh
+        run: ./Scripts/build.ps1 -Version ($env:GITHUB_REF_NAME -replace '^v', '')
+
+      - name: 构建 pxed.exe（命令行）
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force build/bin | Out-Null
+          $v = $env:GITHUB_REF_NAME -replace '^v', ''
+          go build -trimpath -ldflags "-s -w -X main.Version=$v" -o build/bin/pxed.exe ./cmd/pxed
+
+      - name: 冒烟：协议自检
+        shell: pwsh
+        run: ./build/bin/pxed.exe -selftest
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PxeServer-windows-amd64-${{ github.sha }}
+          path: |
+            build/bin/PxeServer.exe
+            build/bin/pxed.exe
+          retention-days: 7

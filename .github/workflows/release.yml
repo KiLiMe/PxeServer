@@ -1,0 +1,141 @@
+name: release
+
+# 只在推送 vX.Y.Z 形式的语义化版本标签时发版，例如：
+#   pwsh ./Scripts/release.ps1 0.2.0        # 只打本地标签，先看一遍
+#   pwsh ./Scripts/release.ps1 0.2.0 -Push  # 打标签并推送，Actions 开始构建发布
+# 带 -alpha/-beta/-rc 的标签会自动标成预发布（prerelease）。其它任何情况都不触发本 workflow。
+on:
+  push:
+    tags:
+      - 'v[0-9]*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: build & publish
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: 校验标签格式
+        shell: pwsh
+        run: |
+          $tag = $env:GITHUB_REF_NAME
+          $semver = '^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(-(alpha|beta|rc)(\.\d+)?)?(\+[0-9A-Za-z.-]+)?$'
+          if ($tag -notmatch $semver) {
+            throw "标签应为 vX.Y.Z（可带 -alpha/-beta/-rc 或 +构建信息，例如 v0.1.0、v0.2.0-rc.1），实际：$tag"
+          }
+          # 版本号（去掉 v）注入 exe：mygo 写文件属性，pxed 写 -X main.Version
+          "VERSION=$($tag.Substring(1))" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          $pre = if ($tag.Contains('-')) { 'true' } else { 'false' }
+          "PRERELEASE=$pre" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "REPO=$($env:GITHUB_SERVER_URL)/$($env:GITHUB_REPOSITORY)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          Write-Host "版本：$tag（预发布：$pre）"
+
+      - name: gofmt
+        shell: pwsh
+        run: |
+          $out = @(gofmt -l .)
+          if ($out.Count -gt 0) {
+            Write-Host '::error::以下文件需要 gofmt：'
+            $out | Write-Host
+            exit 1
+          }
+
+      - name: go vet
+        shell: pwsh
+        run: go vet ./...
+
+      - name: go test
+        shell: pwsh
+        run: go test -count=1 ./...
+
+      - name: 构建 PxeServer.exe（GUI）
+        shell: pwsh
+        run: ./Scripts/build.ps1 -Version $env:VERSION
+
+      - name: 构建 pxed.exe（命令行）
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force build/bin | Out-Null
+          go build -trimpath -ldflags "-s -w -X main.Version=$env:VERSION" -o build/bin/pxed.exe ./cmd/pxed
+
+      - name: 冒烟：协议自检
+        shell: pwsh
+        run: ./build/bin/pxed.exe -selftest
+
+      - name: 打包 + 校验值
+        shell: pwsh
+        run: |
+          $tag = $env:GITHUB_REF_NAME
+          New-Item -ItemType Directory -Force dist | Out-Null
+          $zip = "dist/PxeServer-$tag-windows-amd64.zip"
+          Compress-Archive -Path build/bin/PxeServer.exe, build/bin/pxed.exe, README.md, LICENSE -DestinationPath $zip -Force
+          $files = @('build/bin/PxeServer.exe', 'build/bin/pxed.exe', $zip)
+          $lines = foreach ($f in $files) {
+            "$((Get-FileHash $f -Algorithm SHA256).Hash.ToLower())  $([System.IO.Path]::GetFileName($f))"
+          }
+          Set-Content -Path dist/SHA256SUMS.txt -Value $lines -Encoding utf8NoBOM
+          Get-ChildItem dist | Select-Object Name, Length | Format-Table -AutoSize
+
+      - name: 生成发布说明
+        shell: pwsh
+        run: |
+          $tag = $env:GITHUB_REF_NAME
+          $gover = (go version) -replace '^go version go(\S+) .*$', '$1'
+          $sha = (git rev-parse --short HEAD).Trim()
+          $asset = "PxeServer-$tag-windows-amd64.zip"
+          $lines = @(
+            "## pxed · PXE 启动服务器 $tag",
+            "",
+            "Windows / amd64 构建，Go $gover，提交 ``$sha``。",
+            "",
+            "| 资产 | 说明 |",
+            "| --- | --- |",
+            "| ``PxeServer.exe`` | 原生桌面界面（mygo），配置 / 日志 / 租约都在界面上 |",
+            "| ``pxed.exe`` | 无界面命令行版，适合注册成服务或远程 tail 日志 |",
+            "| ``$asset`` | 上面两个 exe + README / LICENSE |",
+            "| ``SHA256SUMS.txt`` | 校验值 |",
+            "",
+            "首次运行会在 exe 同目录生成 ``config.json``；界面「防火墙 → 放行本程序」按程序路径放行入站。",
+            "",
+            "> **压缩包里不含引导二进制。** ``ipxe.efi`` / ``undionly.kpxe`` / ``wimboot`` / ``*.wim`` / ISO 都要自备，",
+            "> 下载地址见 [$($env:REPO)/blob/$tag/docs/boot-files.md]($($env:REPO)/blob/$tag/docs/boot-files.md)。",
+            "",
+            "### 本次提交",
+            "",
+            "``````",
+            ""
+          )
+          $log = git log --oneline -20 --no-decorate
+          Set-Content -Path dist/notes.md -Value ($lines + $log + @('', '``````')) -Encoding utf8NoBOM
+          Get-Content dist/notes.md | Select-Object -First 12
+
+      - name: 创建 Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $tag = $env:GITHUB_REF_NAME
+          $zip = "dist/PxeServer-$tag-windows-amd64.zip"
+          $ghArgs = @('release', 'create', $tag, '--title', $tag, '--notes-file', 'dist/notes.md', '--verify-tag')
+          if ($env:PRERELEASE -eq 'true') { $ghArgs += '--prerelease' }
+          gh release view $tag --json tagName 2>$null | Out-Null
+          if ($LASTEXITCODE -eq 0) {
+            # 重跑同一次构建时不要报“release 已存在”，直接覆盖资产
+            gh release upload $tag $zip "dist/SHA256SUMS.txt" --clobber
+            gh release edit $tag --title $tag --notes-file dist/notes.md
+          } else {
+            gh @ghArgs $zip "dist/SHA256SUMS.txt"
+          }
+          gh release view $tag --json url --jq '.url'

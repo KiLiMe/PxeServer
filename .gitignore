@@ -1,0 +1,35 @@
+# ---- Go / Wails build output ----
+/build/bin/
+/dist/
+*.exe
+
+# ---- local runtime state (machine specific) ----
+/config.json
+
+# ---- boot artifacts: large, download your own from ipxe.org ----
+/boot/*.efi
+/boot/*.kpxe
+/boot/*.kkpxe
+/boot/*.pxe
+/boot/*.iso
+/boot/*.wim
+/boot/*.sdi
+/boot/*.img
+
+# ---- editor / OS ----
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store
+
+# 临时目录
+/tmp_*/
+PXE-server.log
+PXE-server.log.old
+
+# 临时脚本
+/tmp_*
+
+debug-port.txt
+
+firewall-ok.txt

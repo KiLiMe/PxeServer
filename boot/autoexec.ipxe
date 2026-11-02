@@ -1,0 +1,8 @@
+#!ipxe
+# 由 PXE 启动服务器自动准备：iPXE 起来后先把这一份脚本当作第一入口。
+# 优先通过 HTTP 拉菜单（httpboot.ipxe 由程序按当前 HTTP 端口生成），
+# 这样后面的 initrd（比如 731MB 的 boot.wim）也会走 HTTP；失败再退回 TFTP 的老路子。
+chain tftp://${next-server}/httpboot.ipxe || chain tftp://${next-server}/menu.ipxe || goto failed
+:failed
+echo 无法连接到 ${next-server} 的菜单脚本
+shell

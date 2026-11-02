@@ -1,0 +1,76 @@
+#!ipxe
+# PXE Boot Menu
+#
+# 1) 这里的文件一律写「以 / 开头的相对路径」。iPXE 以“菜单脚本自身的 URI”为基准
+#    解析相对路径，而菜单脚本是由 DHCP 下发的完整 URL
+#    （http://<服务器>:<HTTP端口>/menu.ipxe）拉下来的，所以下面这些请求会自动
+#    走同一个服务器、同一个端口 —— 菜单里不需要写 IP，也不需要写端口。
+# 2) menu / item 的标签只用 ASCII：iPXE 按字节数算列宽，中文（UTF-8 3 字节/字）
+#    会让高亮条和分隔线算错位置，看起来像“断层”。中文放 echo 里没问题。
+
+:start
+menu PXE Boot Menu
+item --gap -- ==== Network boot ====
+item pe        Windows PE (wimboot + boot.wim)
+item --gap -- ==== Local ====
+item config           Configure settings
+item local     Boot from local disk
+item shell     iPXE shell
+item info      Show network info
+item reboot    Reboot
+choose --default pe --timeout 15000 target && goto ${target}
+
+:pe
+# wimboot 同一个二进制同时支持 BIOS 和 UEFI：它内部按固件走 INT 13h 模拟盘
+# （"Emulating drive xx"）或 EFI block I/O protocol，不需要两份 wimboot。
+# 真正要分的是「引导器」：BIOS 只认 bootmgr，UEFI 只认 bootx64.efi。
+# 两个一起塞进虚拟盘时，固件有可能挑到不匹配的那个，所以按 ${platform} 分开给。
+# 注意：iPXE 的 iseq 在字符串不相等时返回错误码 ERANGE（屏幕上显示
+# "Result too large"，见 https://ipxe.org/46022001）。这一行必须用 || 兜住，
+# 否则整段脚本会以失败终止，iPXE 报 "Could not boot image" 后直接退出。
+iseq ${platform} efi || goto pe-bios
+goto pe-efi
+
+:pe-bios
+echo Booting Windows PE on BIOS (${platform})
+kernel /wimboot || goto failed
+initrd /wim-boot/bcd      bcd      || goto failed
+initrd /wim-boot/boot.sdi boot.sdi || goto failed
+initrd /wim-boot/bootmgr  bootmgr  || goto failed
+initrd /BOOT3/boot.wim    boot.wim || goto failed
+boot || goto failed
+
+:pe-efi
+echo Booting Windows PE on UEFI (${platform})
+kernel /wimboot || goto failed
+initrd /wim-boot/bcd         bcd         || goto failed
+initrd /wim-boot/boot.sdi    boot.sdi    || goto failed
+initrd /wim-boot/bootx64.efi bootx64.efi || goto failed
+initrd /BOOT3/boot.wim       boot.wim    || goto failed
+boot || goto failed
+
+:local
+sanboot --no-describe --drive 0x80 || exit 1
+
+:shell
+shell
+goto start
+
+:info
+echo MAC ${net0/mac}
+echo IP ${net0/ip} / ${net0/netmask}
+echo TFTP ${next-server} BOOTFILE ${filename}
+sleep 5
+goto start
+
+:config
+config
+goto start
+
+:reboot
+reboot
+
+:failed
+echo Boot failed.
+shell
+

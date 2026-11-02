@@ -1,0 +1,13 @@
+{
+  "name": "PxeServer",
+  "identifier": "com.kilime.pxeserver",
+  "version": "0.0.0-dev",
+  "copyright": "Copyright (c) 2026 KiLiMe",
+  "main": ".",
+  "out": "build",
+  "icon": "build/appicon.png",
+  "i18n": {
+    "dir": "internal/locales",
+    "source": "zh-Hans"
+  }
+}

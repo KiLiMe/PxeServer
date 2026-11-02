@@ -1,0 +1,31 @@
+# 统一换行：仓库内一律 LF（Windows 工作区也保持 LF，避免每次提交刷 CRLF 警告）
+* text=auto eol=lf
+
+# 图片/字体：不做换行转换，也不做文本 diff
+*.png    binary
+*.jpg    binary
+*.jpeg   binary
+*.gif    binary
+*.ico    binary
+*.bmp    binary
+*.woff   binary
+*.woff2  binary
+*.ttf    binary
+
+# 引导文件与镜像：均为二进制（体积大，仓库里不存，仅作保险）
+*.exe     binary
+*.dll     binary
+*.efi     binary
+*.kpxe    binary
+*.kkpxe   binary
+*.pxe     binary
+*.iso     binary
+*.wim     binary
+*.swm     binary
+*.esd     binary
+*.sdi     binary
+*.img     binary
+*.lkrn    binary
+*.zip     binary
+*.etl     binary
+*.pcapng  binary
