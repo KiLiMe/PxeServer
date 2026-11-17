@@ -9,12 +9,12 @@
 | `main.go` | 唯一的主包文件：mygo 启动、窗口装配、提权分支（`-capture` 截图） |
 | `deps_test.go` | 依赖方向的机械校验（`go list` + 源码扫描） |
 | `cmd/pxed/main.go` | 无界面入口；`cmd/pxed/helpers.go` 为 `-selftest` 自检 |
-| `internal/app/app.go` | `App`：生命周期、`Status`、关于信息；同目录 `services.go` 起停服务、`config.go` 配置持久化、`menu.go` 菜单读写、`logs.go` 日志、`dialogs.go` 文件与目录选择、`firewall.go` 防火墙包装、`debugapi.go` 本地调试接口（仅 `127.0.0.1`） |
-| `internal/ui/ui.go` | mygo 原生界面：六个选项卡的绘制与草稿状态 |
+| `internal/app/app.go` | `App`：生命周期、`Status`、关于信息；同目录 `services.go` 起停服务、`config.go` 配置持久化、`menu.go` 菜单读写、`logs.go` 日志、`dialogs.go` 文件与目录选择、`firewall.go` 防火墙包装、`debugapi.go` 本地调试接口（仅 `-debug-port` 开启，只监听 `127.0.0.1`） |
+| `internal/ui/` | mygo 原生界面：`ui.go` 是状态、调度与通用控件，`home.go`/`settings.go`/`menu.go`/`arch.go`/`logs.go`/`leases.go`/`about.go` 每页一个文件（只调 `App` 的导出方法） |
 | `internal/config/config.go` | `Config`（字段 = 界面控件）、IP 探测；`path.go` 为 `DefaultPath()` |
 | `internal/config/extra.go` | 额外 DHCP 选项解析 |
 | `internal/logbook/logbook.go` | 日志级别（`I`/`W`/`E`）与内核包的 `Logger` 回调签名 |
-| `internal/locales/zh-Hans.json` / `en.json` | 界面文案（源语言 / 英文），`catalog_gen.go` 为 `go tool mygo generate` 生成物；见 `docs/gui.md` 的「界面文案」 |
+| `internal/locales/zh-Hans.json` / `en.json` | 界面文案（源语言 / 英文），`catalog_gen.go` 为 `go tool mygo generate` 生成物；见 `docs/dev-release.md` 的「界面文案（i18n）」 |
 | `internal/dhcp/packet.go` | 手写 BOOTP/DHCP 编解码（236 头 + cookie + TLV） |
 | `internal/dhcp/server.go` | DHCP / ProxyDHCP 应答、租约池、option 43/66/67 |
 | `internal/dhcp/broadcast_{windows,unix}.go` | `SO_BROADCAST` |
@@ -30,7 +30,7 @@
 | `mygo.json` | 打包配置：名称 / 标识 / 版本占位（`0.0.0-dev`，`-Version` 构建时临时改写再还原）/ 图标 / 产物目录 |
 | `.github/workflows/ci.yml` / `release.yml` | 仅语义化版本标签（`vX.Y.Z`，可带 `-alpha/-beta/-rc`）触发 |
 | `config.json` | 本地运行态，已 gitignore，不入库 |
-| `docs/` | 全部说明文档，索引见 `docs/README.md` |
+| `docs/` | 全部说明文档，索引见根 `README.md` |
 
 ## 约定
 
@@ -40,7 +40,7 @@
 
 ### 语言与文本
 - 仓库全部文档、注释、日志、提交信息用**简体中文**；iPXE 菜单、协议字段名保持英文。
-- 界面文字（按钮、标签、弹框、校验错误）一律走 `internal/locales`：改文案先改 JSON 再跑 `go tool mygo generate`；新增带参消息要在源语言里声明 `@key.placeholders`，并同步 `en.json`。日志保持中文不译（`docs/gui.md` 的「界面文案」）。
+- 界面文字（按钮、标签、弹框、校验错误）一律走 `internal/locales`：改文案先改 JSON 再跑 `go tool mygo generate`；新增带参消息要在源语言里声明 `@key.placeholders`，并同步 `en.json`。日志保持中文不译（`docs/dev-release.md` 的「界面文案（i18n）」）。
 - 换行全仓 LF（`.gitattributes` 已声明 `* text=auto eol=lf`）；二进制扩展名标 `binary`。
 - 提交信息用 `type(scope): 摘要`，如 `feat(ui): …`、`docs: …`、`ci: …`、`fix(release): …`。
 
@@ -53,10 +53,7 @@
 - 面向用户的错误信息写中文（`errors.New("…")` 亦同）。
 - 测试：表驱动、`TestXxx` 命名、断言用标准库 `testing`，**不引测试框架**；DHCP 相关用构造报文字节流的方式验证，不依赖真实网络/管理员权限。新增逻辑要带测试。
 - 提交前必须过 `go vet ./...` 与 `go test ./...`（`pwsh ./Scripts/build.ps1 -Test` 一并做）。
-- 版本号：语义化版本 `X.Y.Z`（不兼容升 X、新增功能升 Y、修 Bug 升 Z，高位升级时低位归零；`0.y.z` 为初始开发），
-  预发布加 `-alpha/-beta/-rc`，构建信息用 `+`；细节与发版流程见 `docs/versioning.md`。
-  GUI 显示 `mygo.json` 的 `version`（`Scripts/build.ps1 -Version` 构建时写进去，界面用 `mygo.App.Version()` 读回）；
-  命令行用 `-X main.Version=`。不要硬编码版本。
+- 版本号：遵循语义化版本 `X.Y.Z`，细节与发版流程见 `docs/dev-release.md`。GUI 显示 `mygo.json` 的 `version`（`Scripts/build.ps1 -Version` 构建时写入，界面用 `mygo.App.Version()` 读回）；命令行用 `-X main.Version=`。不要硬编码版本。
 
 ### 资源与产物
 - 不往仓库放二进制（`*.efi`、`*.kpxe`、`*.wim`、`*.iso` 等已被 `.gitignore` 排除）；仓库里没有引导文件，需要时按 `docs/boot-files.md` 自取。
@@ -65,6 +62,6 @@
 - 不留 `rsrc_windows_*.syso`：图标 / 版本 / manifest 都由 `mygo build` 生成，残留的旧 syso 会静默盖掉它们（`Scripts/build.ps1` 会先删）。
 
 ### 文档
-- 细节写进 `docs/`：新增或修改行为时同步对应篇章，并在 `docs/README.md` 与根 `README.md` 的文档表补/改一行。
+- 细节写进 `docs/`：新增或修改行为时同步对应篇章，并在根 `README.md` 的文档表补/改一行。
 - 文档间用相对链接互引；排错先指向 `docs/troubleshooting.md`，能力边界指向 `docs/scope.md`。
 - 常用命令、环境准备等操作说明写在 `docs/getting-started.md`，本文件不再维护命令清单。
