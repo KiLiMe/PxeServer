@@ -1238,6 +1238,16 @@ func (msgs Messages) FirewallUnknown() string {
 	return Catalog.Format(msgs.locale, "firewallUnknown", nil)
 }
 
+// FirewallMoved says "程序已移动（原路径 {path}），请重新放行"
+// in the language the app shows.
+func FirewallMoved(path string) string { return In(i18n.Locale()).FirewallMoved(path) }
+
+// FirewallMoved says "程序已移动（原路径 {path}），请重新放行"
+// in the language of msgs.
+func (msgs Messages) FirewallMoved(path string) string {
+	return Catalog.Format(msgs.locale, "firewallMoved", map[string]any{"path": path})
+}
+
 // AllowProgram says "放行程序"
 // in the language the app shows.
 func AllowProgram() string { return In(i18n.Locale()).AllowProgram() }

@@ -45,6 +45,7 @@ type UI struct {
 	busy                      bool
 	loaded                    bool
 	firewall                  string
+	firewallMoved             string // 程序移动前的旧路径；空串表示没移动过
 	firewallQueried           bool
 	port, poolSize, leaseTime string
 	menu, archKey, archValue  string

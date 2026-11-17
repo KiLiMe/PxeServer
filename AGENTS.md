@@ -20,6 +20,7 @@
 | `internal/dhcp/broadcast_{windows,unix}.go` | `SO_BROADCAST` |
 | `internal/firewall/firewall_windows.go` | 防火墙策略：放行 / 撤销 / 状态 / 提示（`rule_` 规则、`elevate_` 提权、`marker_` 标记） |
 | `internal/firewall/firewall_other.go` | 非 Windows 的占位实现 |
+| `internal/single/single_{windows,other}.go` | 单实例保护：命名互斥体 `Local\PXE Server`，重开时把已有窗口拉到前台 |
 | `internal/netif/netif.go` | 网卡枚举（界面「网卡」下拉数据源） |
 | `internal/shell/shell_{windows,other}.go` | 用系统默认程序打开文件 |
 | `internal/tftp/server.go` | 只读 TFTP，blksize 1468 + tsize |

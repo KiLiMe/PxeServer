@@ -15,6 +15,9 @@ func (u *UI) appSettings(c *ui.Context) {
 	section(c, locales.SectionFirewall(), func() {
 		ui.Button(c, locales.RefreshState()).Disabled(u.busy).OnClick(func() { u.firewallTask(true, nil) })
 		ui.Text(c, locales.FirewallState(u.firewall))
+		if u.firewallMoved != "" {
+			ui.Text(c, locales.FirewallMoved(u.firewallMoved)).FontSize(12).TextColor(ui.Hex("#b54708"))
+		}
 		ui.Row(c).Gap(8).Children(func() {
 			ui.Button(c, locales.AllowProgram()).Disabled(u.busy).OnClick(func() { u.firewallTask(true, u.app.ApplyFirewall) })
 			ui.Button(c, locales.RemoveAllowance()).Disabled(u.busy).OnClick(func() { u.firewallTask(true, u.app.RemoveFirewall) })
@@ -45,10 +48,11 @@ func (u *UI) firewallTask(notify bool, action func() string) {
 	})
 }
 
-// firewallApply 把最新放行状态写进界面，供刷新与放行/撤销共用。
+// firewallApply 把最新放行状态与「程序是否移动过」写进界面，供刷新与放行/撤销共用。
 func (u *UI) firewallApply() func() {
 	label := firewallLabel(u.app.FirewallState())
-	return func() { u.firewall = label }
+	moved := u.app.FirewallMovedFrom()
+	return func() { u.firewall = label; u.firewallMoved = moved }
 }
 
 // setLanguage 立即切换界面语言，并把所选语言记进草稿配置（仍需保存配置才落盘）。

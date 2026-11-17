@@ -1,12 +1,19 @@
 package app
 
 import (
+	"pxeserv/internal/config"
 	"pxeserv/internal/firewall"
 	"pxeserv/internal/locales"
 )
 
 func (a *App) FirewallState() string {
 	return firewall.State()
+}
+
+// FirewallMovedFrom 返回程序移动前的旧路径；没移动过（或没放行过）返回空串。
+// 非管理员读不到规则，但 config.json 的放行标记会指出路径已经变了。
+func (a *App) FirewallMovedFrom() string {
+	return firewall.MovedFrom(config.DefaultPath(), firewall.ExePath())
 }
 
 // ApplyFirewall 按“程序路径”放行入站（不按端口）。返回空串表示成功。

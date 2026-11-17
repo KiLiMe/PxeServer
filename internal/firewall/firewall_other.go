@@ -12,3 +12,6 @@ func Remove() error   { return nil }
 func State() string   { return "on" }
 func Hint() string    { return "" }
 func ExePath() string { return "?" }
+
+// 没有防火墙规则可查，也就没有「程序移动过」这回事。
+func MovedFrom(_, _ string) string { return "" }

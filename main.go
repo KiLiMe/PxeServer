@@ -15,6 +15,7 @@ import (
 	"pxeserv/internal/app"
 	"pxeserv/internal/firewall"
 	"pxeserv/internal/locales"
+	"pxeserv/internal/single"
 	"pxeserv/internal/ui"
 )
 
@@ -25,6 +26,20 @@ func main() {
 	// 提权分支（-firewall-apply/-firewall-remove）要在 mygo 初始化之前处理并直接退出。
 	if firewall.HandleCLI() {
 		return
+	}
+	// 单实例：已有窗口在跑时把它拉到前台就退出，避免两份都去抢 67/69/80 端口、
+	// 互相覆盖同一个 config.json。
+	release, already, err := single.Acquire("Local\\PXE Server")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "单实例检查：", err)
+	} else {
+		defer release()
+		if already {
+			if !single.Focus(locales.AppTitle()) {
+				fmt.Fprintln(os.Stderr, "已有一个 PXE 启动服务器在运行。")
+			}
+			return
+		}
 	}
 	capture := flag.String("capture", "", "把窗口截图写到指定 PNG 后退出")
 	debugPort := flag.Int("debug-port", 0, "本机调试接口端口（仅 127.0.0.1；0 或不传表示不开）")

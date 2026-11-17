@@ -134,6 +134,8 @@
   "firewallOn": "allowed",
   "firewallOff": "not allowed",
   "firewallUnknown": "unknown",
+  "firewallMoved": "Program moved (was {path}); allow it again",
+  "@firewallMoved": { "placeholders": { "path": { "type": "String" } } },
   "allowProgram": "Allow this program",
   "removeAllowance": "Remove the allowance",
   "allowFirewallFailed": "Could not allow the program through the firewall: {err}",

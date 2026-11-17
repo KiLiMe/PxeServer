@@ -149,6 +149,8 @@
   "firewallOn": "已放行",
   "firewallOff": "未放行",
   "firewallUnknown": "未知",
+  "firewallMoved": "程序已移动（原路径 {path}），请重新放行",
+  "@firewallMoved": { "placeholders": { "path": { "type": "String" } } },
   "allowProgram": "放行程序",
   "removeAllowance": "撤销放行",
   "allowFirewallFailed": "放行防火墙失败：{err}",

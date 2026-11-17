@@ -268,6 +268,20 @@ func TestFirewallOnSettingsTab(t *testing.T) {
 	}
 }
 
+// TestFirewallMovedHint 保证放行标记里的旧路径会在设置页显示成「请重新放行」。
+func TestFirewallMovedHint(t *testing.T) {
+	u := New(app.NewInMemory(config.Default()))
+	u.Load()
+	u.firewallQueried = true
+	old := `D:\Old\PxeServer.exe`
+	u.firewallMoved = old
+	u.tab = tabSettings
+	settings := ui.NewTester(u.View, 1000, 800)
+	if _, ok := settings.Find(locales.FirewallMoved(old)); !ok {
+		t.Fatal("程序移动后设置页应提示重新放行")
+	}
+}
+
 func TestProxyDHCPShowsPoolHint(t *testing.T) {
 	u := New(app.NewInMemory(config.Default()))
 	u.Load()
