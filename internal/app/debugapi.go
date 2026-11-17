@@ -1,6 +1,7 @@
 package app
 
-// 本地调试接口：只监听 127.0.0.1 的随机端口，实际地址写在 config.json 的 runtime.debug_addr。
+// 本地调试接口：只能通过命令行 -debug-port <端口> 打开，只监听 127.0.0.1 的该端口，
+// 实际地址写在 config.json 的 runtime.debug_addr。不传参数时完全不启动。
 // 存在的意义是让脚本（包括 AI）能直接观察和驱动正在运行的程序，
 // 而不必像以前那样再编一个命令行版可执行文件去抢 67/69 端口。
 // 只接受本机直连：带 Origin 头的请求（浏览器跨站）与 Host 对不上监听地址的请求（DNS 重绑定）一律 403。
@@ -24,6 +25,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -36,12 +38,28 @@ type debugAPI struct {
 	addr string
 }
 
+// debugListenAddr 把 -debug-port 的端口号换算成监听地址：
+// 0 表示不开接口（返回空地址），只监听回环地址，非 1–65535 视为参数错误。
+func debugListenAddr(port int) (string, error) {
+	if port == 0 {
+		return "", nil
+	}
+	if port < 0 || port > 65535 {
+		return "", fmt.Errorf("端口 %d 不在 1–65535 范围内", port)
+	}
+	return net.JoinHostPort("127.0.0.1", strconv.Itoa(port)), nil
+}
+
 func (a *App) startDebugAPI() {
-	cfg := a.snapshot()
-	if cfg == nil || !cfg.DebugAPI {
+	addr, err := debugListenAddr(a.debugPort)
+	if err != nil {
+		a.Warnf("调试接口：%v（已跳过）", err)
 		return
 	}
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if addr == "" {
+		return
+	}
+	ln, err := net.Listen("tcp", addr)
 	if err != nil {
 		a.Warnf("调试接口：%v（已跳过）", err)
 		return
@@ -51,15 +69,13 @@ func (a *App) startDebugAPI() {
 	mux.HandleFunc("/logs", a.dbgLogs)
 	mux.HandleFunc("/config", func(w http.ResponseWriter, r *http.Request) { writeJSON(w, a.snapshot()) })
 	mux.HandleFunc("/start", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		if !postOnly(w, r) {
 			return
 		}
 		writeJSON(w, map[string]string{"result": orOK(a.StartServices())})
 	})
 	mux.HandleFunc("/stop", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		if !postOnly(w, r) {
 			return
 		}
 		a.StopServices()
@@ -71,14 +87,13 @@ func (a *App) startDebugAPI() {
 	mux.HandleFunc("/http", a.dbgHTTP)
 	mux.HandleFunc("/interfaces", func(w http.ResponseWriter, r *http.Request) { writeJSON(w, a.ListInterfaces()) })
 
-	addr := ln.Addr().String()
-	d := &debugAPI{srv: &http.Server{Handler: guardLocal(addr, mux)}, addr: addr}
+	lnAddr := ln.Addr().String()
+	d := &debugAPI{srv: &http.Server{Handler: guardLocal(lnAddr, mux)}, addr: lnAddr}
 	a.mu.Lock()
 	a.debug = d
-	path := a.cfgPath
 	a.mu.Unlock()
 	// 端口对外可见：写进 config.json 的 runtime 段，脚本读一份文件就够。
-	_ = config.SetRuntime(path, func(r *config.Runtime) { r.DebugAddr = d.addr })
+	_ = config.SetRuntime(a.cfgPath, func(r *config.Runtime) { r.DebugAddr = d.addr })
 	a.Logf("调试接口：http://%s（仅本机）", d.addr)
 	go func() { _ = d.srv.Serve(ln) }()
 }
@@ -87,13 +102,12 @@ func (a *App) stopDebugAPI() {
 	a.mu.Lock()
 	d := a.debug
 	a.debug = nil
-	path := a.cfgPath
 	a.mu.Unlock()
 	if d == nil {
 		return
 	}
 	_ = d.srv.Close()
-	_ = config.SetRuntime(path, func(r *config.Runtime) { r.DebugAddr = "" })
+	_ = config.SetRuntime(a.cfgPath, func(r *config.Runtime) { r.DebugAddr = "" })
 }
 
 // guardLocal 只放行本机直连的请求。命令行与 curl 不会带 Origin，
@@ -131,6 +145,15 @@ func writeJSON(w http.ResponseWriter, v any) {
 	enc := json.NewEncoder(w)
 	enc.SetIndent("", "  ")
 	_ = enc.Encode(v)
+}
+
+// postOnly 只放行 POST；其余方法写 405 并返回 false。
+func postOnly(w http.ResponseWriter, r *http.Request) bool {
+	if r.Method == http.MethodPost {
+		return true
+	}
+	http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	return false
 }
 
 func orOK(msg string) string {

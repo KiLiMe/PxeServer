@@ -28,7 +28,9 @@ type App struct {
 	tftpSrv *tftp.Server
 	httpSrv *httpd.Server
 	running bool
-	debug   *debugAPI // 本地调试接口（127.0.0.1 随机端口）
+	debug   *debugAPI // 本地调试接口（仅由 -debug-port 打开，127.0.0.1 + 指定端口）
+	// debugPort 是命令行 -debug-port 传入的端口；0 表示不开调试接口。
+	debugPort int
 
 	logs    []LogLine     // ring buffer, newest last
 	logSeq  uint64        // 递增序号，供界面判断是否需要重新拷贝日志
@@ -38,7 +40,6 @@ type App struct {
 }
 
 // Status 在每次启停时推给界面，运行期间由界面轮询。
-
 type Status struct {
 	Running  bool         `json:"running"`
 	Proxy    bool         `json:"proxy"`
@@ -47,8 +48,8 @@ type Status struct {
 	HTTP     bool         `json:"http"`
 	ServerIP string       `json:"serverIp"`
 	Leases   []dhcp.Lease `json:"leases"`
-	// DebugAddr 是本次运行中调试接口的实际地址（如 127.0.0.1:54321），
-	// 端口随机、仅本机；未启用或未启动时为空。
+	// DebugAddr 是本次运行中调试接口的实际地址（如 127.0.0.1:18080），
+	// 来自 -debug-port、仅本机；未传参数或未启动时为空。
 	DebugAddr string `json:"debugAddr"`
 }
 
@@ -62,6 +63,10 @@ func NewApp() *App {
 // AttachWindow 记下主窗口，弹框时作为父窗口；由 main 在界面创建后调用。
 func (a *App) AttachWindow(win *mygo.Window) { a.window = win }
 
+// SetDebugPort 记录命令行 -debug-port；0 表示不开调试接口。
+// 必须在 Startup 之前调用，端口只在启动时读一次。
+func (a *App) SetDebugPort(port int) { a.debugPort = port }
+
 // SetLanguage 切换界面语言：tag 为 BCP 47 标签（如 "en"），空串表示跟随系统。
 // 选中的语言由 mygo 自己记住，配置里的 language 只是让我们开机时能重新应用。
 func (a *App) SetLanguage(tag string) { mygo.App.SetLocale(tag) }
@@ -71,9 +76,6 @@ func (a *App) SetLanguage(tag string) { mygo.App.SetLocale(tag) }
 func NewInMemory(cfg *config.Config) *App {
 	return &App{cfg: cfg}
 }
-
-// legacyRuntimeFiles 是运行态曾经散落在 exe 同目录的几个小文件，
-// 现在并入 config.json 的 runtime 段，启动时迁移后删掉。
 
 func (a *App) Startup(ctx context.Context) {
 	a.ctx = ctx
@@ -123,19 +125,14 @@ func (a *App) Shutdown(ctx context.Context) {
 	a.mu.Unlock()
 }
 
-// Logf appends to the ring buffer, pushes the line to the UI and queues it for
-// disk. The in-memory/UI copy keeps only HH:MM:SS; the file line carries the full
-// date so a log that spans days stays readable.
-
+// DetectIP 返回默认路由所在网卡的 IPv4 地址。
 func (a *App) DetectIP() string { return config.DetectIP() }
 
 // AppVersion 是开发构建的版本号占位：发版由 mygo build 把 mygo.json 的 version
 // 写进 exe 资源与 mygo.packageVersion，界面用 Version() 读回。
-
 var AppVersion = "dev"
 
 // Version 返回界面显示的版本号：发版构建取 exe 里写死的版本，go run 等开发构建回落为 AppVersion。
-
 func Version() string {
 	if v := mygo.App.Version(); v != "" {
 		return v
@@ -143,8 +140,7 @@ func Version() string {
 	return AppVersion
 }
 
-// FirewallState 返回防火墙放行状态：on / off / unknown。
-
+// ListInterfaces 列出所有非环回 IPv4 网卡（界面「网卡」下拉的数据源）。
 func (a *App) ListInterfaces() []netif.Iface {
 	return netif.List()
 }
@@ -176,7 +172,6 @@ func ifaceName(ip string) string {
 }
 
 // About 返回“关于”对话框内容：版本、监听端口与使用要点。
-
 func (a *App) About() string {
 	a.mu.Lock()
 	cfg := a.cfg

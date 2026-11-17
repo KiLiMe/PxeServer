@@ -61,7 +61,6 @@ func (a *App) writeHTTPHint(cfg *config.Config) {
 
 // urlPort 返回 URL 里该写的端口后缀：默认的 80 不写，其余端口写 ":端口"。
 // 这样界面上看到、菜单里生成的地址都是 http://192.168.5.1/... 这种干净形式。
-
 func urlPort(port int) string {
 	if port <= 0 || port == 80 {
 		return ""
@@ -69,8 +68,8 @@ func urlPort(port int) string {
 	return fmt.Sprintf(":%d", port)
 }
 
-// StartServices starts DHCP, TFTP and HTTP. A port that is already taken is
-// reported through a native dialog because it is the single most common failure.
+// StartServices 依次拉起 DHCP、TFTP 与 HTTP，返回空串表示成功。
+// 端口被占用是最常见的失败，用系统对话框提示一次。
 func (a *App) StartServices() string {
 	a.mu.Lock()
 	if a.running {
@@ -183,7 +182,6 @@ func (a *App) StartServices() string {
 // otherSubnetHint 在启动完成后提醒「本机还有别的网段」。
 // 客户端接在别的网卡上时，它的广播到不了绑在 server_ip 上的 socket，
 // 日志里一个包都不会出现——这是「之前好好的，突然启动不了」最常见的原因。
-
 func otherSubnetHint(list []netif.Iface, cfg *config.Config) string {
 	own := net.ParseIP(cfg.ServerIP).To4()
 	mask := net.ParseIP(cfg.SubnetMask).To4()
@@ -253,8 +251,7 @@ func (a *App) Status() Status {
 	return st
 }
 
-// ReleaseLease drops a single lease so the address can be handed out again.
-
+// ReleaseLease 按 MAC 释放一条租约，让地址可以再次分配。
 func (a *App) ReleaseLease(mac string) string {
 	a.mu.Lock()
 	srv := a.dhcpSrv
@@ -268,5 +265,3 @@ func (a *App) ReleaseLease(mac string) string {
 	a.Logf("DHCPd：已释放租约 %s", mac)
 	return ""
 }
-
-// Logs returns the buffered log lines (used to repopulate the panel on reload).

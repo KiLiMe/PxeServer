@@ -2,6 +2,7 @@ package config
 
 import (
 	"bytes"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -36,7 +37,7 @@ type Config struct {
 	FilterUserClass bool              `json:"filter_user_class"` // 仅当 user-class=gPXE/iPXE 时才下发文件名
 	MenuFile        string            `json:"menu_file"`         // iPXE 菜单脚本
 
-	// 高级项（界面里的“更多”折叠区）
+	// 高级项：界面上直接排在主页的「启动与 DHCP 选项」里，没有折叠区。
 	RootPath       string `json:"root_path"`          // Option 17 根路径
 	ClassID        string `json:"class_id"`           // Option 60 ClassID，默认 PXEClient
 	BootServerHost string `json:"boot_server_host"`   // Option 66 覆盖值
@@ -52,8 +53,6 @@ type Config struct {
 
 	// AutoStart 打开程序后自动启动服务（否则等用户点“启动”）。
 	AutoStart bool `json:"autostart"`
-	// DebugAPI 是否在 127.0.0.1 的随机端口开一个只读调试接口（地址写进 runtime.debug_addr）。
-	DebugAPI bool `json:"debug_api"`
 
 	// Language 是界面语言（BCP 47 标签，如 "zh-Hans"、"en"），留空表示跟随系统。
 	Language string `json:"language"`
@@ -67,7 +66,7 @@ type Config struct {
 // Runtime 记录跨进程可见的运行态：提权后的防火墙子进程写它，
 // 主进程读它显示“已放行”；调试接口的端口也放这里，脚本读 config.json 即可。
 type Runtime struct {
-	// DebugAddr 是本次运行中调试接口的地址（如 127.0.0.1:54321），未运行时空。
+	// DebugAddr 是本次运行中调试接口的地址（如 127.0.0.1:18080），未运行时空。
 	DebugAddr string `json:"debug_addr"`
 	// FirewallExe 是上次按程序路径放行成功的 exe 路径；非管理员进程据此判断放行状态。
 	FirewallExe string `json:"firewall_exe"`
@@ -103,9 +102,22 @@ func Default() *Config {
 		TFTPRoot:        "./boot",
 		HTTPPort:        80, // 与正版 TinyPXE 一致，浏览器直接 http://<服务器>/ 就能看首页
 		AutoStart:       false,
-		DebugAPI:        true,
 		NoOption43:      true, // 默认不给 EFI 发 Option 43；传统 BIOS 不受此开关影响
 	}
+}
+
+// Clone 返回配置的深拷贝：调用方可以随意改，不会影响正在使用的配置。
+// nil 视为「还没加载配置」，回落到默认配置。
+func (c *Config) Clone() *Config {
+	if c == nil {
+		return Default()
+	}
+	v := *c
+	v.BootFileByArch = make(map[string]string, len(c.BootFileByArch))
+	for k, file := range c.BootFileByArch {
+		v.BootFileByArch[k] = file
+	}
+	return &v
 }
 
 func Load(path string) (*Config, error) {
@@ -135,7 +147,7 @@ func (c *Config) Save(path string) (bool, error) {
 	defer fileMu.Unlock()
 	// runtime 段归 SetRuntime 所有：沿用磁盘上的运行态，避免保存界面配置时
 	// 把“调试接口在跑”“防火墙已放行”这类信息抹掉。
-	if st, err := readRuntime(path); err == nil {
+	if st, err := ReadRuntime(path); err == nil {
 		c.Runtime = st
 	}
 	return c.saveLocked(path)
@@ -156,7 +168,10 @@ func (c *Config) saveLocked(path string) (bool, error) {
 	return true, nil
 }
 
-func readRuntime(path string) (Runtime, error) {
+// ReadRuntime 只读 runtime 段，不校验、不补默认值：
+// 配置本身有错（比如地址池不在同一子网）时 Load 会报错，
+// 但“防火墙放行过没有”这类运行态仍然有效。
+func ReadRuntime(path string) (Runtime, error) {
 	var out Runtime
 	b, err := os.ReadFile(path)
 	if err != nil {
@@ -221,37 +236,45 @@ func (c *Config) Normalize() error {
 	}
 	// 单个 DHCP 选项值上限 255 字节，BOOTP 的 file 字段上限 128 字节，超了会被静默截断，
 	// 与其让用户在客户端那边猜，不如直接报错。
-	for name, v := range map[string]string{"option17": c.RootPath, "option252": c.PrivateOption} {
-		if len(v) > 255 {
-			return errors.New(locales.ErrOptionTooLong(name, len(v)))
-		}
-	}
-	for name, v := range map[string]string{"boot_file": c.BootFile, "menu_file": c.MenuFile, "boot_file_option67": c.BootFileOption} {
-		if len(v) > 127 {
-			return errors.New(locales.ErrBootFieldTooLong(name, len(v)))
-		}
-	}
-	for name, v := range map[string]string{
-		"server_ip": c.ServerIP, "next_server": c.NextServer, "pool_start": c.PoolStart,
-		"subnet_mask": c.SubnetMask, "router": c.Router, "dns": c.DNS, "broadcast": c.Broadcast,
+	for _, f := range []struct{ name, val string }{
+		{"option17", c.RootPath},
+		{"option252", c.PrivateOption},
 	} {
-		if v == "" {
+		if len(f.val) > 255 {
+			return errors.New(locales.ErrOptionTooLong(f.name, len(f.val)))
+		}
+	}
+	for _, f := range []struct{ name, val string }{
+		{"boot_file", c.BootFile},
+		{"menu_file", c.MenuFile},
+		{"boot_file_option67", c.BootFileOption},
+	} {
+		if len(f.val) > 127 {
+			return errors.New(locales.ErrBootFieldTooLong(f.name, len(f.val)))
+		}
+	}
+	// 按界面从上到底的顺序固定校验次序，报错指向的字段才可预期。
+	for _, f := range []struct{ name, val string }{
+		{"server_ip", c.ServerIP},
+		{"next_server", c.NextServer},
+		{"pool_start", c.PoolStart},
+		{"subnet_mask", c.SubnetMask},
+		{"router", c.Router},
+		{"dns", c.DNS},
+		{"broadcast", c.Broadcast},
+	} {
+		if f.val == "" {
 			continue
 		}
-		if net.ParseIP(v).To4() == nil {
-			return errors.New(locales.ErrNotIPv4(name, v))
+		if net.ParseIP(f.val).To4() == nil {
+			return errors.New(locales.ErrNotIPv4(f.name, f.val))
 		}
 	}
 	if _, err := c.ParseExtraOptions(); err != nil {
 		return err
 	}
-	for name, v := range map[string]string{"boot_server_host": c.BootServerHost} {
-		if v == "" {
-			continue
-		}
-		if net.ParseIP(v).To4() == nil {
-			return errors.New(locales.ErrNotIPv4(name, v))
-		}
+	if c.BootServerHost != "" && net.ParseIP(c.BootServerHost).To4() == nil {
+		return errors.New(locales.ErrNotIPv4("boot_server_host", c.BootServerHost))
 	}
 	if c.ServerIP == "" {
 		return errors.New(locales.ErrNoServerIP())
@@ -294,7 +317,7 @@ func ipToU32(ip net.IP) uint32 {
 	if ip4 == nil {
 		return 0
 	}
-	return uint32(ip4[0])<<24 | uint32(ip4[1])<<16 | uint32(ip4[2])<<8 | uint32(ip4[3])
+	return binary.BigEndian.Uint32(ip4)
 }
 
 // inPool 判断 ip 是否落在 start 开始、count 个地址的范围里。

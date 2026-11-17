@@ -16,15 +16,16 @@ func (a *App) dialog(title, msg string) {
 	}()
 }
 
+// PickFolder 让用户选启动目录；取消或出错时返回空串，由界面保持原值。
 func (a *App) PickFolder(current string) string {
 	if a.ctx == nil {
-		return current
+		return ""
 	}
 	paths, err := mygo.Dialog.Open(mygo.OpenDialogOptions{
 		Parent: a.window, Title: locales.PickBootRootTitle(), DefaultPath: current, Directory: true,
 	})
 	if err != nil || len(paths) == 0 {
-		return current
+		return ""
 	}
 	return paths[0]
 }

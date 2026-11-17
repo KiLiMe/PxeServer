@@ -24,7 +24,6 @@ func logFilePath() string {
 // openLogFile 在 exe 同目录追加写 PXE-server.log，超过 2MB 先轮转成 .old。
 // 每次启动先写一行会话头，方便在长日志里定位“这次运行”。
 // 失败不影响运行（只是没有文件日志）。
-
 func openLogFile() *os.File {
 	path := logFilePath()
 	if st, err := os.Stat(path); err == nil && st.Size() > 2<<20 {
@@ -40,7 +39,6 @@ func openLogFile() *os.File {
 }
 
 // writeLogs 单线程消费 logQ：落盘 I/O 不再占用 a.mu，也不卡界面。
-
 func (a *App) writeLogs() {
 	defer close(a.logDone)
 	for line := range a.logQ {
@@ -93,9 +91,6 @@ func (a *App) logAt(level logbook.Level, format string, args ...any) {
 	a.mu.Unlock()
 }
 
-// dialog reports a fatal-ish error both in the log panel and as a native
-// message box (port already in use etc. is easy to miss in a log).
-
 // Logs 返回当前缓冲的日志（旧到新）。
 func (a *App) Logs() []LogLine {
 	a.mu.Lock()
@@ -132,7 +127,6 @@ func (a *App) ClearLogs() {
 
 // SaveLogFile 把当前缓冲的日志导出成 txt（默认文件名带日期），
 // 返回空串表示成功，否则是错误信息；用户取消时返回 ""。
-
 func (a *App) SaveLogFile() string {
 	lines := a.LogText()
 	if a.ctx == nil {
@@ -159,5 +153,3 @@ func (a *App) SaveLogFile() string {
 	a.Logf("日志：已导出 %d 行到 %s", len(lines), path)
 	return ""
 }
-
-// The native view polls Status and Logs on its UI thread.

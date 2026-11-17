@@ -24,7 +24,9 @@ func program() (string, error) {
 // psQuote 把路径转义进单引号字符串，避免路径里的 ' 破坏脚本。
 func psQuote(s string) string { return strings.ReplaceAll(s, "'", "''") }
 
-func runPowerShell(script string) error {
+// powershellOutput 运行一段 PowerShell 脚本并返回标准输出。
+// 失败时把脚本自己打印的报错带出来，调用方不必再拼命令与输出。
+func powershellOutput(script string) (string, error) {
 	cmd := exec.Command("powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", script)
 	cmd.SysProcAttr = &windows.SysProcAttr{HideWindow: true}
 	out, err := cmd.CombinedOutput()
@@ -33,9 +35,14 @@ func runPowerShell(script string) error {
 		if text == "" {
 			text = err.Error()
 		}
-		return fmt.Errorf("%s", text)
+		return "", fmt.Errorf("%s", text)
 	}
-	return nil
+	return strings.TrimSpace(string(out)), nil
+}
+
+func runPowerShell(script string) error {
+	_, err := powershellOutput(script)
+	return err
 }
 
 // applyRules 先删同名旧规则，再按程序路径建一条入站放行规则。
@@ -84,13 +91,11 @@ if (-not $r) { 'off'; exit }
 $f = Get-NetFirewallApplicationFilter -AssociatedNetFirewallRule $r -ErrorAction SilentlyContinue
 if ($f -and $f.Program -eq '%s') { 'on' } else { 'off' }`,
 		psQuote(ruleName), psQuote(exe))
-	cmd := exec.Command("powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", script)
-	cmd.SysProcAttr = &windows.SysProcAttr{HideWindow: true}
-	out, err := cmd.Output()
+	out, err := powershellOutput(script)
 	if err != nil {
 		return "unknown"
 	}
-	switch strings.TrimSpace(string(out)) {
+	switch out {
 	case "on":
 		return "on"
 	case "off":

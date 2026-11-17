@@ -14,7 +14,6 @@ var legacyRuntimeFiles = []string{"debug-port.txt", "firewall-ok.txt"}
 // migrateLegacyRuntimeFiles 把旧文件的运行态并进 config.json，再删掉旧文件。
 // firewall-ok.txt 里存的是上次放行成功的 exe 路径，丢了会让非管理员进程
 // 把「已放行」误报成「未知」，所以先导入再删。
-
 func migrateLegacyRuntimeFiles(cfgPath string) {
 	dir := filepath.Dir(cfgPath)
 	markPath := filepath.Join(dir, "firewall-ok.txt")
@@ -38,15 +37,10 @@ func (a *App) GetConfig() *config.Config {
 	if a.cfg == nil {
 		return nil
 	}
-	c := *a.cfg
-	c.BootFileByArch = make(map[string]string, len(a.cfg.BootFileByArch))
-	for k, v := range a.cfg.BootFileByArch {
-		c.BootFileByArch[k] = v
-	}
-	return &c
+	return a.cfg.Clone()
 }
 
-// SaveConfig validates and persists the configuration, returning "" on success.
+// SaveConfig 校验并保存配置，返回空串表示成功。
 func (a *App) SaveConfig(c config.Config) string {
 	if err := c.Normalize(); err != nil {
 		return err.Error()
@@ -81,6 +75,7 @@ func (a *App) SaveConfig(c config.Config) string {
 	return ""
 }
 
+// snapshot 返回当前配置指针（只读使用），配置为空时返回 nil。
 func (a *App) snapshot() *config.Config {
 	a.mu.Lock()
 	defer a.mu.Unlock()

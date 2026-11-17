@@ -19,9 +19,11 @@ func markerMatches() bool {
 	if err != nil {
 		return false
 	}
-	cfg, err := config.Load(config.DefaultPath())
-	if err != nil {
-		return false
-	}
-	return cfg.Runtime.FirewallExe == exe
+	return markerMatchesExe(config.DefaultPath(), exe)
+}
+
+// markerMatchesExe 只看 runtime 段：配置文件本身不合法时也要能读到放行标记。
+func markerMatchesExe(path, exe string) bool {
+	rt, err := config.ReadRuntime(path)
+	return err == nil && rt.FirewallExe == exe
 }

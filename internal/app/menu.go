@@ -14,8 +14,7 @@ func (a *App) menuPath() string {
 	return filepath.Join(a.cfg.TFTPRoot, a.cfg.MenuFile)
 }
 
-// ReadMenuFile returns the current iPXE script, or a template when missing.
-
+// ReadMenuFile 读取当前 iPXE 脚本；文件不存在时返回模板。
 func (a *App) ReadMenuFile() string {
 	p := a.menuPath()
 	b, err := os.ReadFile(p)
@@ -49,7 +48,6 @@ func (a *App) WriteMenuFile(text string) string {
 
 // OpenMenuFile 用系统默认程序打开菜单文件（没有关联程序时用记事本），
 // 方便直接改菜单而不用先导出再导入。文件不存在时先生成模板。
-
 func (a *App) OpenMenuFile() string {
 	p := a.menuPath()
 	if _, err := os.Stat(p); err != nil {
@@ -67,5 +65,3 @@ func (a *App) OpenMenuFile() string {
 	a.Logf("菜单：已用编辑器打开 %s", p)
 	return ""
 }
-
-// snapshot 返回当前配置指针（只读使用），配置为空时返回 nil。

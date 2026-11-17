@@ -66,15 +66,24 @@ func Remove() error {
 }
 
 // State 返回放行状态：on / off / unknown。
-// 管理员直接查规则；非管理员查不到时用上次放行成功留下的标记兜底。
+// 管理员直接查规则；查不动时退回放行标记。
+// 非管理员读不到规则（系统拒绝访问），按标记判断，没有标记就按未放行显示。
 func State() string {
-	if !isElevated() {
-		if markerMatches() {
-			return "on"
+	if isElevated() {
+		if s := stateElevated(); s != "unknown" {
+			return s
 		}
-		return "unknown"
 	}
-	return stateElevated()
+	return stateFromMarker(markerMatches())
+}
+
+// stateFromMarker 在查不到规则时只用放行标记下结论：
+// 没标记就当没放行，给出可操作的结论，而不是没有下文的「未知」。
+func stateFromMarker(marked bool) string {
+	if marked {
+		return "on"
+	}
+	return "off"
 }
 
 // Hint 给启动日志用：没放行过就给一句提示。
@@ -82,12 +91,12 @@ func Hint() string {
 	if markerMatches() {
 		return ""
 	}
-	return "防火墙：尚未按程序路径放行，若客户端拿不到 IP 或文件，点「更多 → 防火墙 → 放行本程序」"
+	return "防火墙：尚未按程序路径放行，若客户端拿不到 IP 或文件，点「设置 → 放行程序」"
 }
 
-// ExePath 返回当前可执行文件路径（给日志用）。
+// ExePath 返回当前可执行文件路径（给日志用），取不到时用 "?"。
 func ExePath() string {
-	exe, err := os.Executable()
+	exe, err := program()
 	if err != nil {
 		return "?"
 	}

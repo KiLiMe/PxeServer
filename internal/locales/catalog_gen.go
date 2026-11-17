@@ -104,24 +104,14 @@ func (msgs Messages) SaveConfig() string {
 	return Catalog.Format(msgs.locale, "saveConfig", nil)
 }
 
-// UnsavedChanges says "有尚未保存的修改；保存后应用，运行中的服务会自动重启。"
+// UnsavedBadge says "未保存"
 // in the language the app shows.
-func UnsavedChanges() string { return In(i18n.Locale()).UnsavedChanges() }
+func UnsavedBadge() string { return In(i18n.Locale()).UnsavedBadge() }
 
-// UnsavedChanges says "有尚未保存的修改；保存后应用，运行中的服务会自动重启。"
+// UnsavedBadge says "未保存"
 // in the language of msgs.
-func (msgs Messages) UnsavedChanges() string {
-	return Catalog.Format(msgs.locale, "unsavedChanges", nil)
-}
-
-// Working says "处理中…"
-// in the language the app shows.
-func Working() string { return In(i18n.Locale()).Working() }
-
-// Working says "处理中…"
-// in the language of msgs.
-func (msgs Messages) Working() string {
-	return Catalog.Format(msgs.locale, "working", nil)
+func (msgs Messages) UnsavedBadge() string {
+	return Catalog.Format(msgs.locale, "unsavedBadge", nil)
 }
 
 // Done says "操作完成"
@@ -134,14 +124,14 @@ func (msgs Messages) Done() string {
 	return Catalog.Format(msgs.locale, "done", nil)
 }
 
-// LoadingConfig says "正在加载配置…"
+// CloseToast says "关闭提示"
 // in the language the app shows.
-func LoadingConfig() string { return In(i18n.Locale()).LoadingConfig() }
+func CloseToast() string { return In(i18n.Locale()).CloseToast() }
 
-// LoadingConfig says "正在加载配置…"
+// CloseToast says "关闭提示"
 // in the language of msgs.
-func (msgs Messages) LoadingConfig() string {
-	return Catalog.Format(msgs.locale, "loadingConfig", nil)
+func (msgs Messages) CloseToast() string {
+	return Catalog.Format(msgs.locale, "closeToast", nil)
 }
 
 // SectionLanguage says "界面"
@@ -182,6 +172,16 @@ func LanguageEnglish() string { return In(i18n.Locale()).LanguageEnglish() }
 // in the language of msgs.
 func (msgs Messages) LanguageEnglish() string {
 	return Catalog.Format(msgs.locale, "languageEnglish", nil)
+}
+
+// TabHome says "主页"
+// in the language the app shows.
+func TabHome() string { return In(i18n.Locale()).TabHome() }
+
+// TabHome says "主页"
+// in the language of msgs.
+func (msgs Messages) TabHome() string {
+	return Catalog.Format(msgs.locale, "tabHome", nil)
 }
 
 // TabSettings says "设置"
@@ -234,14 +234,14 @@ func (msgs Messages) TabLogs() string {
 	return Catalog.Format(msgs.locale, "tabLogs", nil)
 }
 
-// TabFirewallAbout says "防火墙 / 关于"
+// TabAbout says "关于"
 // in the language the app shows.
-func TabFirewallAbout() string { return In(i18n.Locale()).TabFirewallAbout() }
+func TabAbout() string { return In(i18n.Locale()).TabAbout() }
 
-// TabFirewallAbout says "防火墙 / 关于"
+// TabAbout says "关于"
 // in the language of msgs.
-func (msgs Messages) TabFirewallAbout() string {
-	return Catalog.Format(msgs.locale, "tabFirewallAbout", nil)
+func (msgs Messages) TabAbout() string {
+	return Catalog.Format(msgs.locale, "tabAbout", nil)
 }
 
 // ManualEntry says "手动填写"
@@ -282,6 +282,16 @@ func IfaceApplied(name string) string { return In(i18n.Locale()).IfaceApplied(na
 // in the language of msgs.
 func (msgs Messages) IfaceApplied(name string) string {
 	return Catalog.Format(msgs.locale, "ifaceApplied", map[string]any{"name": name})
+}
+
+// IfaceDown says "未连接"
+// in the language the app shows.
+func IfaceDown() string { return In(i18n.Locale()).IfaceDown() }
+
+// IfaceDown says "未连接"
+// in the language of msgs.
+func (msgs Messages) IfaceDown() string {
+	return Catalog.Format(msgs.locale, "ifaceDown", nil)
 }
 
 // Rescan says "重新扫描"
@@ -582,16 +592,6 @@ func AutoStart() string { return In(i18n.Locale()).AutoStart() }
 // in the language of msgs.
 func (msgs Messages) AutoStart() string {
 	return Catalog.Format(msgs.locale, "autoStart", nil)
-}
-
-// DebugAPI says "启用本机调试 API"
-// in the language the app shows.
-func DebugAPI() string { return In(i18n.Locale()).DebugAPI() }
-
-// DebugAPI says "启用本机调试 API"
-// in the language of msgs.
-func (msgs Messages) DebugAPI() string {
-	return Catalog.Format(msgs.locale, "debugAPI", nil)
 }
 
 // DebugAddr says "调试 API 地址：{addr}"
@@ -1056,26 +1056,6 @@ func SectionLogs() string { return In(i18n.Locale()).SectionLogs() }
 // in the language of msgs.
 func (msgs Messages) SectionLogs() string {
 	return Catalog.Format(msgs.locale, "sectionLogs", nil)
-}
-
-// FilterAll says "全部"
-// in the language the app shows.
-func FilterAll() string { return In(i18n.Locale()).FilterAll() }
-
-// FilterAll says "全部"
-// in the language of msgs.
-func (msgs Messages) FilterAll() string {
-	return Catalog.Format(msgs.locale, "filterAll", nil)
-}
-
-// FilterErrors says "故障线索"
-// in the language the app shows.
-func FilterErrors() string { return In(i18n.Locale()).FilterErrors() }
-
-// FilterErrors says "故障线索"
-// in the language of msgs.
-func (msgs Messages) FilterErrors() string {
-	return Catalog.Format(msgs.locale, "filterErrors", nil)
 }
 
 // CopyLog says "复制"

@@ -42,7 +42,7 @@ type Server struct {
 	mainConn *net.UDPConn // udp:67，绑在 server_ip 上（收+发都走这块网卡）
 	bootConn *net.UDPConn // udp:4011，ProxyDHCP 模式下应答 PXE 启动服务请求
 
-	extra  map[byte][]byte // 额外 DHCP 选项，来自“更多”里的自定义项
+	extra  map[byte][]byte // 额外 DHCP 选项，来自主页的「额外 DHCP 选项」输入框
 	mu     sync.Mutex
 	leases map[string]*lease // MAC -> 租约
 	byIP   map[string]string // IP -> MAC

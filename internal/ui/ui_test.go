@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"net"
 	"strings"
 	"testing"
 
@@ -66,6 +67,19 @@ func TestNativeRefreshPreservesDraftSelection(t *testing.T) {
 		t.Fatalf("selection overwritten: %q", u.iface)
 	}
 }
+
+// TestIfaceLabelMarksUnconnected 保证没链路的网卡在下拉里带标注，已启用的不带。
+func TestIfaceLabelMarksUnconnected(t *testing.T) {
+	up := netif.Iface{Name: "以太网", IP: "192.168.5.1", Up: true}
+	if got := ifaceLabel(up); got != "以太网 · 192.168.5.1" {
+		t.Fatalf("已启用的网卡不应带后缀：%q", got)
+	}
+	down := netif.Iface{Name: "以太网 2", IP: "192.168.1.151"}
+	if got := ifaceLabel(down); !strings.Contains(got, locales.IfaceDown()) {
+		t.Fatalf("未连接的网卡应标注：%q", got)
+	}
+}
+
 func TestNativeMenuPathBinding(t *testing.T) {
 	u := New(app.NewInMemory(config.Default()))
 	u.Load()
@@ -90,17 +104,10 @@ func TestTroubleLines(t *testing.T) {
 		t.Fatalf("logText 应保留全部三行：%q", text)
 	}
 }
-func TestNativeStartFailureMessage(t *testing.T) {
-	result := startResult("", "端口占用")
-	if !strings.Contains(result, "配置已保存") || !strings.Contains(result, "服务未启动") {
-		t.Fatalf("ambiguous result: %s", result)
-	}
-}
 func TestNativeBusyKeepsPage(t *testing.T) {
 	u := New(app.NewInMemory(config.Default()))
 	u.Load()
 	u.busy = true
-	u.msg = "处理中…"
 	tt := ui.NewTester(u.View, 1000, 800)
 	for _, label := range []string{"服务", "网络", "服务器 IP"} {
 		if _, ok := tt.Find(label); !ok {
@@ -151,7 +158,7 @@ func TestFirewallLabel(t *testing.T) {
 func TestMenuDirtyAndViewHint(t *testing.T) {
 	u := New(app.NewInMemory(config.Default()))
 	u.Load()
-	u.tab = 2
+	u.tab = tabMenu
 	u.menuLoaded = true
 	u.menuPath = u.currentMenuPath()
 	u.menu = "#!ipxe\nboot\n"
@@ -176,27 +183,28 @@ func TestAddArchMappingValidation(t *testing.T) {
 
 	u.archKey = "abc"
 	u.archValue = "ipxe.efi"
-	if u.addArchMapping() || u.msgKind != msgError {
-		t.Fatalf("非数字架构号应校验失败: kind=%d msg=%q", u.msgKind, u.msg)
+	u.addArchMapping()
+	if lastToastType(u) != "error" {
+		t.Fatalf("非数字架构号应校验失败: pending=%v", u.pending)
 	}
 
 	u.archKey = "-1"
 	u.archValue = "ipxe.efi"
-	if u.addArchMapping() || u.msgKind != msgError {
+	u.addArchMapping()
+	if lastToastType(u) != "error" {
 		t.Fatalf("负数架构号应校验失败")
 	}
 
 	u.archKey = "7"
 	u.archValue = "   "
-	if u.addArchMapping() || u.msgKind != msgError {
+	u.addArchMapping()
+	if lastToastType(u) != "error" {
 		t.Fatalf("空文件名应校验失败")
 	}
 
 	u.archKey = " 10 "
 	u.archValue = " arm64.efi "
-	if !u.addArchMapping() {
-		t.Fatalf("合法输入添加失败: %q", u.msg)
-	}
+	u.addArchMapping()
 	if got := u.cfg.BootFileByArch["10"]; got != "arm64.efi" {
 		t.Fatalf("映射值 = %q，期望 arm64.efi", got)
 	}
@@ -213,12 +221,50 @@ func TestFilteredLogText(t *testing.T) {
 		{Level: logbook.Error, Text: "err line"},
 	}
 	u.filter = 0
-	if got := u.filteredLogText(); !strings.Contains(got, "info line") || !strings.Contains(got, "err line") {
+	if got := u.filteredLogText(troubleLines(u.logs)); !strings.Contains(got, "info line") || !strings.Contains(got, "err line") {
 		t.Fatalf("全量复制内容异常: %q", got)
 	}
 	u.filter = 1
-	if got := u.filteredLogText(); strings.Contains(got, "info line") || !strings.Contains(got, "warn line") || !strings.Contains(got, "err line") {
+	if got := u.filteredLogText(troubleLines(u.logs)); strings.Contains(got, "info line") || !strings.Contains(got, "warn line") || !strings.Contains(got, "err line") {
 		t.Fatalf("故障筛选复制内容异常: %q", got)
+	}
+}
+
+// TestHomeAndSettingsTabs 保证「界面」选项只出现在新的「设置」页，主页不再出现。
+func TestHomeAndSettingsTabs(t *testing.T) {
+	u := New(app.NewInMemory(config.Default()))
+	u.Load()
+	u.firewallQueried = true // 设置页会自动查一次防火墙，测试里没有窗口，先跳过
+	home := ui.NewTester(u.View, 1000, 800)
+	if _, ok := home.Find(locales.LanguageSystem()); ok {
+		t.Fatal("主页不应再展示界面语言选项")
+	}
+	u.tab = tabSettings
+	settings := ui.NewTester(u.View, 1000, 800)
+	if _, ok := settings.Find(locales.LanguageSystem()); !ok {
+		t.Fatal("设置页应展示界面语言选项")
+	}
+}
+
+// TestFirewallOnSettingsTab 保证防火墙只在「设置」页，「关于」页只剩关于信息。
+func TestFirewallOnSettingsTab(t *testing.T) {
+	u := New(app.NewInMemory(config.Default()))
+	u.Load()
+	u.firewallQueried = true
+
+	u.tab = tabAbout
+	about := ui.NewTester(u.View, 1000, 800)
+	if _, ok := about.Find(locales.AllowProgram()); ok {
+		t.Fatal("「关于」页不应再出现防火墙按钮")
+	}
+	if _, ok := about.Find(locales.SectionAbout()); !ok {
+		t.Fatal("「关于」页应保留关于信息")
+	}
+
+	u.tab = tabSettings
+	settings := ui.NewTester(u.View, 1000, 800)
+	if _, ok := settings.Find(locales.AllowProgram()); !ok {
+		t.Fatal("「设置」页应包含防火墙按钮")
 	}
 }
 
@@ -232,14 +278,90 @@ func TestProxyDHCPShowsPoolHint(t *testing.T) {
 	}
 }
 
-func TestInferMsgKind(t *testing.T) {
-	if got := inferMsgKind(locales.ConfigSavedApplied()); got != msgSuccess {
-		t.Fatalf("成功消息分级 = %d，期望 msgSuccess", got)
+func TestResultLevels(t *testing.T) {
+	if got := ok("x", nil); got.kind != msgSuccess {
+		t.Fatalf("成功结果级别 = %d，期望 msgSuccess", got.kind)
 	}
-	if got := inferMsgKind(locales.HttpPortNotInt()); got != msgError {
-		t.Fatalf("错误消息分级 = %d，期望 msgError", got)
+	if got := notice("x", nil); got.kind != msgInfo {
+		t.Fatalf("提示结果级别 = %d，期望 msgInfo", got.kind)
 	}
-	if got := inferMsgKind(locales.FolderUnchanged()); got != msgInfo {
-		t.Fatalf("普通提示分级 = %d，期望 msgInfo", got)
+	if got := failed("x"); got.kind != msgError {
+		t.Fatalf("失败结果级别 = %d，期望 msgError", got.kind)
+	}
+	if got := silent(nil); !got.silent {
+		t.Fatal("静默结果不应弹提示")
+	}
+	if got := done(nil); got.kind != msgSuccess || got.text != locales.Done() {
+		t.Fatalf("done 结果 = %+v", got)
+	}
+}
+
+// lastToastType 返回队列里最后一条提示的类型，供校验类测试断言。
+func lastToastType(u *UI) string {
+	if len(u.pending) == 0 {
+		return ""
+	}
+	return u.pending[len(u.pending)-1].Type
+}
+
+// TestToastLevels 锁定「成功自动消失、错误常驻」这两条策略：类型写错会让
+// 错误提示 4 秒后自己消失，用户就看不到失败原因了。
+func TestToastLevels(t *testing.T) {
+	u := &UI{}
+	u.setMsg(msgSuccess, "已保存")
+	u.setMsg(msgError, "保存失败")
+	if len(u.pending) != 2 {
+		t.Fatalf("应排队两条 Toast，实际 %d", len(u.pending))
+	}
+	if t0 := u.pending[0]; t0.Type != "success" || t0.Timeout != 0 || t0.Title != "已保存" {
+		t.Fatalf("成功 Toast = %+v", t0)
+	}
+	if t1 := u.pending[1]; t1.Type != "error" || t1.Timeout >= 0 {
+		t.Fatalf("错误 Toast 应常驻：%+v", t1)
+	}
+	u.setMsg(msgError, "又失败了")
+	if len(u.pending) != 2 || u.pending[1].Title != "又失败了" {
+		t.Fatalf("新错误应顶掉旧错误：%+v", u.pending)
+	}
+}
+
+// TestToastAndBadge 确认消息真的上了界面，而且未保存标记在同一行显示。
+func TestToastAndBadge(t *testing.T) {
+	u := New(app.NewInMemory(config.Default()))
+	u.Load()
+	u.setMsg(msgSuccess, "已保存")
+	tt := ui.NewTester(u.View, 1000, 800)
+	if _, ok := tt.Find("已保存"); !ok {
+		t.Fatal("Toast 未出现在界面里")
+	}
+	u.cfg.HTTPPort++
+	tt = ui.NewTester(u.View, 1000, 800)
+	if _, ok := tt.Find("● " + locales.UnsavedBadge()); !ok {
+		t.Fatal("改了配置应显示未保存标记")
+	}
+	u.setMsg(msgError, "保存失败")
+	tt = ui.NewTester(u.View, 1000, 800)
+	if _, ok := tt.Find("保存失败"); !ok {
+		t.Fatal("错误 Toast 未出现在界面里")
+	}
+}
+
+func TestIPAdd(t *testing.T) {
+	cases := []struct {
+		name string
+		ip   string
+		n    int
+		want string
+	}{
+		{"网段起点加二", "192.168.100.0", 2, "192.168.100.2"},
+		{"撞上服务器再挪一位", "192.168.100.1", 3, "192.168.100.4"},
+		{"末位进位", "192.168.100.255", 1, "192.168.101.0"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := ipAdd(net.ParseIP(tc.ip), tc.n).String(); got != tc.want {
+				t.Fatalf("ipAdd(%s, %d) = %s，期望 %s", tc.ip, tc.n, got, tc.want)
+			}
+		})
 	}
 }

@@ -27,8 +27,10 @@ func main() {
 		return
 	}
 	capture := flag.String("capture", "", "把窗口截图写到指定 PNG 后退出")
+	debugPort := flag.Int("debug-port", 0, "本机调试接口端口（仅 127.0.0.1；0 或不传表示不开）")
 	flag.Parse()
 	a := app.NewApp()
+	a.SetDebugPort(*debugPort)
 	done := make(chan struct{})
 	var startup sync.WaitGroup
 	var screen *ui.UI

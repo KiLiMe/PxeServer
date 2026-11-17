@@ -95,6 +95,31 @@ func TestLogsSinceAndStartReentry(t *testing.T) {
 	}
 }
 
+func TestDebugListenAddr(t *testing.T) {
+	cases := []struct {
+		name    string
+		port    int
+		want    string
+		wantErr bool
+	}{
+		{"不传参数不开接口", 0, "", false},
+		{"正常端口只监听回环地址", 18080, "127.0.0.1:18080", false},
+		{"上边界 65535", 65535, "127.0.0.1:65535", false},
+		{"负数拒绝", -1, "", true},
+		{"超过 65535 拒绝", 70000, "", true},
+	}
+	for _, c := range cases {
+		got, err := debugListenAddr(c.port)
+		if (err != nil) != c.wantErr {
+			t.Errorf("%s：err = %v，wantErr = %v", c.name, err, c.wantErr)
+			continue
+		}
+		if got != c.want {
+			t.Errorf("%s：地址 = %q，应为 %q", c.name, got, c.want)
+		}
+	}
+}
+
 func TestDebugAPIMethodGuard(t *testing.T) {
 	a := NewInMemory(config.Default())
 	mux := http.NewServeMux()
