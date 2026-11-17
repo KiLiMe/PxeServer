@@ -107,7 +107,7 @@ jobs:
             "| ``$asset`` | 上面两个 exe + README / LICENSE |",
             "| ``SHA256SUMS.txt`` | 校验值 |",
             "",
-            "首次运行会在 exe 同目录生成 ``config.json``；界面「防火墙 → 放行本程序」按程序路径放行入站。",
+            "首次运行会在 exe 同目录生成 ``config.json``；界面「设置 → 放行程序」按程序路径放行入站。",
             "",
             "> **压缩包里不含引导二进制。** ``ipxe.efi`` / ``undionly.kpxe`` / ``wimboot`` / ``*.wim`` / ISO 都要自备，",
             "> 下载地址见 [$($env:REPO)/blob/$tag/docs/boot-files.md]($($env:REPO)/blob/$tag/docs/boot-files.md)。",

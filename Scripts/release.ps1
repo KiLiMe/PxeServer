@@ -1,6 +1,6 @@
 #Requires -Version 7.0
 # 按语义化版本生成并推送标签，形如 v0.2.0、v0.3.0-rc.1；推送后 GitHub Actions 自动构建并发布 Release。
-# 规则见 docs/versioning.md：不兼容改动升主版本，兼容性新增功能升次版本，修 Bug 升修订号，升级高位时低位归零。
+# 规则见 docs/dev-release.md：不兼容改动升主版本，兼容性新增功能升次版本，修 Bug 升修订号，升级高位时低位归零。
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true, Position = 0)][string]$Version,
