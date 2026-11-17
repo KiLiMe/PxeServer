@@ -37,7 +37,7 @@ kernel /wimboot || goto failed
 initrd /wim-boot/bcd      bcd      || goto failed
 initrd /wim-boot/boot.sdi boot.sdi || goto failed
 initrd /wim-boot/bootmgr  bootmgr  || goto failed
-initrd /BOOT3/boot.wim    boot.wim || goto failed
+initrd /WIM_BOOT_X/boot.wim    boot.wim || goto failed
 boot || goto failed
 
 :pe-efi
@@ -46,7 +46,7 @@ kernel /wimboot || goto failed
 initrd /wim-boot/bcd         bcd         || goto failed
 initrd /wim-boot/boot.sdi    boot.sdi    || goto failed
 initrd /wim-boot/bootx64.efi bootx64.efi || goto failed
-initrd /BOOT3/boot.wim       boot.wim    || goto failed
+initrd /WIM_BOOT_X/boot.wim       boot.wim    || goto failed
 boot || goto failed
 
 :local
