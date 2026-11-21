@@ -16,7 +16,7 @@ pwsh ./Scripts/build.ps1 -Test   # 3. 测试并构建 PxeServer.exe
 
 | 文档 | 内容 |
 | --- | --- |
-| [运行与实测](docs/getting-started.md) | Linux 网卡选择、命令行启动检查与 PXE 实测 |
+| [运行与实测](docs/getting-started.md) | Linux 网卡与启动目录选择、命令行启动检查与 PXE 实测 |
 
 ## 依赖环境
 
