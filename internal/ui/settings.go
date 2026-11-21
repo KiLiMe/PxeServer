@@ -12,17 +12,21 @@ func (u *UI) appSettings(c *ui.Context) {
 	section(c, locales.SectionLanguage(), func() {
 		ui.Select(c, &u.lang, []string{locales.LanguageSystem(), locales.LanguageChinese(), locales.LanguageEnglish()}).FillWidth().OnChange(func() { u.setLanguage(u.lang) })
 	})
-	section(c, locales.SectionFirewall(), func() {
-		ui.Button(c, locales.RefreshState()).Disabled(u.busy).OnClick(func() { u.firewallTask(true, nil) })
-		ui.Text(c, locales.FirewallState(u.firewall))
-		if u.firewallMoved != "" {
-			ui.Text(c, locales.FirewallMoved(u.firewallMoved)).FontSize(12).TextColor(ui.Hex("#b54708"))
-		}
-		ui.Row(c).Gap(8).Children(func() {
-			ui.Button(c, locales.AllowProgram()).Disabled(u.busy).OnClick(func() { u.firewallTask(true, u.app.ApplyFirewall) })
-			ui.Button(c, locales.RemoveAllowance()).Disabled(u.busy).OnClick(func() { u.firewallTask(true, u.app.RemoveFirewall) })
+	// 防火墙放行只有 Windows 才有：其它平台的防火墙按端口区分，没有「按程序放行」这回事，
+	// 整块不画（否则按钮点下去只会弹一句“此平台不需要放行防火墙”）。
+	if u.firewallSupported {
+		section(c, locales.SectionFirewall(), func() {
+			ui.Button(c, locales.RefreshState()).Disabled(u.busy).OnClick(func() { u.firewallTask(true, nil) })
+			ui.Text(c, locales.FirewallState(u.firewall))
+			if u.firewallMoved != "" {
+				ui.Text(c, locales.FirewallMoved(u.firewallMoved)).FontSize(12).TextColor(ui.Hex("#b54708"))
+			}
+			ui.Row(c).Gap(8).Children(func() {
+				ui.Button(c, locales.AllowProgram()).Disabled(u.busy).OnClick(func() { u.firewallTask(true, u.app.ApplyFirewall) })
+				ui.Button(c, locales.RemoveAllowance()).Disabled(u.busy).OnClick(func() { u.firewallTask(true, u.app.RemoveFirewall) })
+			})
 		})
-	})
+	}
 }
 
 // firewallTask 统一「刷新状态」与「放行/撤销」两条路径：都在后台执行，

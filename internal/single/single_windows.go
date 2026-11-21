@@ -21,10 +21,10 @@ var (
 
 const swRestore = 9
 
-// Acquire 抢一个命名互斥体。
+// Acquire 抢一个命名互斥体（名字进 Local 命名空间，即“本登录会话”，提权后的副本也能被挡住）。
 // release 关闭句柄；already 为真表示已有实例持着它，此时 release 是空操作。
 func Acquire(name string) (release func(), already bool, err error) {
-	namep, err := windows.UTF16PtrFromString(name)
+	namep, err := windows.UTF16PtrFromString("Local\\" + name)
 	if err != nil {
 		return func() {}, false, fmt.Errorf("互斥体名不合法：%w", err)
 	}

@@ -1,5 +1,20 @@
 # 能力边界与未实现
 
+## 平台支持
+
+Windows 与 Linux 共用同一套 `internal/` 内核，行为一致（同一 DHCP/TFTP/HTTP 代码、同一种配置格式），差异全在边界上：
+
+| | Windows | Linux |
+| --- | --- | --- |
+| 桌面界面 | `PxeServer.exe`（mygo） | `pxeserver`（同一份 mygo 代码，系统 GTK3 + WebKitGTK） |
+| 命令行 | `pxed.exe` | `pxed` |
+| 67/69/80 特权端口 | 无需管理员 | 需 `setcap` / `sudo` / systemd `AmbientCapabilities` |
+| 防火墙 | 界面一键「放行程序」（按程序路径） | 不提供（块级隐藏）；自己开 `dhcp` 服务与 `69/udp` |
+| 单实例 | 命名互斥体 + 把窗口拉到前台 | `flock` 锁文件 + 一句话提示退出 |
+| 发行方式 | 单文件 exe / zip | `.deb`、`.rpm`、`PKGBUILD`、`install.sh` tar.gz |
+
+本仓库只发 Windows 与 Linux 的 amd64 构建。macOS / 其它架构（arm64 等）理论上是同一个 mygo 后端、能自己 `go tool mygo build -target` 出来，但目前未验证、也不提供安装包。
+
 ## 支持矩阵
 
 | 映像 | 状态 | 依赖 |
@@ -44,3 +59,4 @@
 
 - DHCP 租约池为内存表（重启清空），无 ARP 冲突探测。
 - 仓库不包含任何引导二进制，见 [boot-files.md](boot-files.md)。
+- Linux 不做窗口激活（无通用 X11/Wayland 接口），第二次启动只提示后退出。

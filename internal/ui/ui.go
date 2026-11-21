@@ -47,6 +47,7 @@ type UI struct {
 	firewall                  string
 	firewallMoved             string // 程序移动前的旧路径；空串表示没移动过
 	firewallQueried           bool
+	firewallSupported         bool // 当前平台有没有「按程序放行」这件事（只有 Windows 有）
 	port, poolSize, leaseTime string
 	menu, archKey, archValue  string
 	pending                   []ui.Toast
@@ -120,6 +121,7 @@ func (u *UI) Load() {
 	u.iface = u.manualLabel()
 	u.syncIface()
 	u.firewall = locales.FirewallPending()
+	u.firewallSupported = u.app.FirewallSupported()
 	u.lang = langLabel(u.cfg.Language)
 	u.savedKey = u.draftKey()
 	u.loaded = true
@@ -170,7 +172,8 @@ func (u *UI) View(c *ui.Context) {
 			ui.Button(c, locales.SaveConfig()).Disabled(u.busy).OnClick(func() { u.saveAndStart(false) })
 		})
 		ui.Segmented(c, &u.tab, locales.TabHome(), locales.TabLeases(), locales.TabBootMenu(), locales.TabArch(), locales.TabLogs(), locales.TabSettings(), locales.TabAbout()).FillWidth()
-		if u.tab == tabSettings && !u.firewallQueried && !u.busy {
+		// 只有 Windows 有放行状态可查：进设置页时偷一次（不弹提示），其它平台不必要。
+		if u.tab == tabSettings && !u.firewallQueried && !u.busy && u.firewallSupported {
 			u.firewallTask(false, nil)
 		}
 		ui.Scroll(c).Grow(1).Children(func() {

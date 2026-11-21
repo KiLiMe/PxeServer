@@ -19,17 +19,17 @@
 | `internal/dhcp/server.go` | DHCP / ProxyDHCP 应答、租约池、option 43/66/67 |
 | `internal/dhcp/broadcast_{windows,unix}.go` | `SO_BROADCAST` |
 | `internal/firewall/firewall_windows.go` | 防火墙策略：放行 / 撤销 / 状态 / 提示（`rule_` 规则、`elevate_` 提权、`marker_` 标记） |
-| `internal/firewall/firewall_other.go` | 非 Windows 的占位实现 |
-| `internal/single/single_{windows,other}.go` | 单实例保护：命名互斥体 `Local\PXE Server`，重开时把已有窗口拉到前台 |
+| `internal/firewall/firewall_other.go` | 非 Windows 的占位实现（`Supported()` 恒为假，界面因此隐藏防火墙那一段） |
+| `internal/single/single_{windows,linux,other}.go` | 单实例保护：Windows 命名互斥体 `Local\PXE Server` + 拉前台；Linux `flock` 锁文件 `runtime_dir/pxe-server.lock`，只提示不激活窗口 |
 | `internal/netif/netif.go` | 网卡枚举（界面「网卡」下拉数据源） |
 | `internal/shell/shell_{windows,other}.go` | 用系统默认程序打开文件 |
 | `internal/tftp/server.go` | 只读 TFTP，blksize 1468 + tsize |
 | `internal/httpd/server.go` | HTTP 静态服务（wimboot / iPXE kernel / `/iso/`） |
 | `internal/isorom/iso.go` | ISO9660 只读视图（ISO 直连已剥离，仅余后端；见 `docs/scope.md`） |
 | `boot/menu.ipxe` | 示例 iPXE 菜单（**唯一入库**的 boot 文件） |
-| `Scripts/build.ps1` / `Scripts/release.ps1` | 本地构建（`-Test` 跑 vet+test，`go tool mygo build` 出 exe，`-Version X.Y.Z` 写版本资源）/ 打标签发版（`Scripts/release.ps1 X.Y.Z [-Push]`）；脚本一律放 `Scripts/` |
-| `mygo.json` | 打包配置：名称 / 标识 / 版本占位（`0.0.0-dev`，`-Version` 构建时临时改写再还原）/ 图标 / 产物目录 |
-| `.github/workflows/ci.yml` / `release.yml` | 仅语义化版本标签（`vX.Y.Z`，可带 `-alpha/-beta/-rc`）触发 |
+| `Scripts/build.ps1` / `Scripts/release.ps1` | 本地构建（`-Test` 跑 vet+test，`go tool mygo build` 出产物，`-Version X.Y.Z` 写版本资源，`-Target windows|linux` 选平台）/ 打标签发版（`Scripts/release.ps1 X.Y.Z [-Push]`）；脚本一律放 `Scripts/` |
+| `mygo.json` | 打包配置：名称 / 标识 / 版本占位（`0.0.0-dev`，`-Version` 构建时临时改写再还原，deb/rpm 文件名也按它生成）/ 图标 / 产物目录 |
+| `.github/workflows/ci.yml` / `release.yml` | `ci.yml` 跑分支 / PR 的格式与测试；`release.yml` 仅语义化版本标签（`vX.Y.Z`，可带 `-alpha/-beta/-rc`）触发，Windows + Linux 双平台矩阵构建后统一发布 |
 | `config.json` | 本地运行态，已 gitignore，不入库 |
 | `docs/` | 全部说明文档，索引见根 `README.md` |
 
@@ -49,6 +49,7 @@
 - 模块名 `pxeserv`，Go 1.27.3；依赖只有 `egoist/mygo`、`kdomanski/iso9660`、`pin/tftp/v3`、`golang.org/x/sys`。**不要随意加依赖**。
 - 内核与 UI 解耦：`internal/*` 不 import 主包，也不直接打印；日志一律走 `internal/logbook.Logger` 回调。级别由写日志的一端标注：`a.Logf`（信息）、`a.Warnf`（警告，客户端侧失败、端口没绑上这类）、`a.Errorf`（本次运行真的坏了）。`deps_test.go` 机械校验“不 import 主包、不直接打印”这两条。
 - 布局固定：根目录只放 `main.go`（+ `deps_test.go`）。界面代码放 `internal/ui`（只调 `App` 的导出方法，不 import 内核包）；服务编排、配置持久化、日志、菜单、选文件对话框、调试接口放 `internal/app`（按职责分文件，别堆回一个文件）；能被独立测试的纯逻辑放各自的 `internal/<名字>` 包。新功能不要往根目录加文件。
+- 平台差异按文件后缀分：`*_windows.go`、`*_linux.go`，其余平台落实在 `*_other.go`（构建约束 `!windows && !linux`），对外只暴露同一个函数名，调用处不写 `runtime.GOOS` 分支。
 - 日志前缀统一 `DHCPd：` / `TFTPd：` / `HTTPd：`（**全角冒号**），其后接句子；术语用中文（`架构`、`地址池`），MAC 保持 `MAC=`。
 - `Config` 结构体字段与界面控件一一对应；新增字段同步 `internal/config/config.go` 与界面，并考虑 `normalize` / 运行态（`runtime.*`）回落逻辑。
 - 面向用户的错误信息写中文（`errors.New("…")` 亦同）。

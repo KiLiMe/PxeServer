@@ -28,8 +28,9 @@ func main() {
 		return
 	}
 	// 单实例：已有窗口在跑时把它拉到前台就退出，避免两份都去抢 67/69/80 端口、
-	// 互相覆盖同一个 config.json。
-	release, already, err := single.Acquire("Local\\PXE Server")
+	// 互相覆盖同一个 config.json。名字由平台自己套命名空间：
+	// Windows 用互斥体 Local\PXE Server，Linux 用 $XDG_RUNTIME_DIR/pxe-server.lock。
+	release, already, err := single.Acquire("PXE Server")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "单实例检查：", err)
 	} else {

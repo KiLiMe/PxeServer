@@ -250,7 +250,8 @@ func TestHomeAndSettingsTabs(t *testing.T) {
 func TestFirewallOnSettingsTab(t *testing.T) {
 	u := New(app.NewInMemory(config.Default()))
 	u.Load()
-	u.firewallQueried = true
+	u.firewallQueried = true   // 设置页会自动查一次防火墙，测试里没有窗口，先跳过
+	u.firewallSupported = true // 按 Windows 的布局验证（其它平台整块隐藏，见下一个测试）
 
 	u.tab = tabAbout
 	about := ui.NewTester(u.View, 1000, 800)
@@ -273,12 +274,30 @@ func TestFirewallMovedHint(t *testing.T) {
 	u := New(app.NewInMemory(config.Default()))
 	u.Load()
 	u.firewallQueried = true
+	u.firewallSupported = true
 	old := `D:\Old\PxeServer.exe`
 	u.firewallMoved = old
 	u.tab = tabSettings
 	settings := ui.NewTester(u.View, 1000, 800)
 	if _, ok := settings.Find(locales.FirewallMoved(old)); !ok {
 		t.Fatal("程序移动后设置页应提示重新放行")
+	}
+}
+
+// TestFirewallHiddenWhenUnsupported 非 Windows 没有「按程序放行」：设置页不画防火墙那一段，
+// 免得按钮点下去只弹一句“此平台不需要放行防火墙”。
+func TestFirewallHiddenWhenUnsupported(t *testing.T) {
+	u := New(app.NewInMemory(config.Default()))
+	u.Load()
+	u.firewallQueried = true
+	u.firewallSupported = false
+	u.tab = tabSettings
+	settings := ui.NewTester(u.View, 1000, 800)
+	if _, ok := settings.Find(locales.AllowProgram()); ok {
+		t.Fatal("不支持放行的平台不应出现防火墙按钮")
+	}
+	if _, ok := settings.Find(locales.SectionLanguage()); !ok {
+		t.Fatal("其余设置项应照常显示")
 	}
 }
 

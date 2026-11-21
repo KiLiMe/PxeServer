@@ -27,6 +27,16 @@
 
 ## 5. 双击第二次没反应
 
-- **现象**：已经开着一个界面时再双击 `PxeServer.exe`，新进程一闪而过。
-- **原因**：单实例保护生效：第二个进程抢不到命名互斥体，把已有窗口切到前台后立即退出。
-- **解法**：无需处理；窗口没弹到前面时用任务栏切过去。要同时跑两个服务端，请用 `pxed.exe` 并改端口/启动目录（两份会争 67/69/80，默认配置下第二份必然失败）。
+- **现象**：已经开着一个界面时再启动一个，新进程一闪而过（Linux 终端里只印一句「已有一个 PXE 启动服务器在运行。」）。
+- **原因**：单实例保护生效：第二个进程抢不到单实例锁（Windows 命名互斥体 `Local\PXE Server`，Linux `runtime_dir/pxe-server.lock` 上的 `flock`），退出。
+- **解法**：无需处理；Windows 会把已有窗口拉前台（Linux 不做窗口激活，自己切过去）。要同时跑两个服务端，请用 `pxed` 并改端口/启动目录（两份会争 67/69/80，默认配置下第二份必然失败）。
+
+## 6. Linux 上服务起不来：`bind: permission denied`
+
+- **现象**：日志里 `DHCPd：` / `TFTPd：` 报绑定 `:67` / `:69` 失败，服务按钮弹回未运行；`pxed` 直接退出。
+- **原因**：低于 1024 的端口是特权端口，普通用户绑不了（Windows 没这个限制，所以界面里不会提示）。
+- **解法**：任选一种——
+  - `sudo setcap 'cap_net_bind_service=+ep' /usr/bin/pxeserver`（或你解压/编译出来的路径），之后普通用户可直接运行；用 `.deb` / `.rpm` 装的升级后要重设。
+  - `sudo ./pxeserver` / `sudo ./pxed`（注意 `config.json` 与 `PXE-server.log` 会落在当前目录，且归 root 所有）。
+  - 用 systemd 服务并加 `AmbientCapabilities=CAP_NET_BIND_SERVICE`。
+- **附带**：Linux 的防火墙按端口而不是按程序，界面不提供「放行程序」；开着 firewalld 的发行版（Fedora / RHEL / openSUSE）要自己开：`sudo firewall-cmd --add-service=dhcp --add-port=69/udp --add-port=80/tcp`（HTTP 端口按你配的改）。ufw 同理：`sudo ufw allow 67/udp` 等。

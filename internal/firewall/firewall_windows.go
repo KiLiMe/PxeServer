@@ -17,6 +17,9 @@ import (
 	"golang.org/x/sys/windows"
 )
 
+// Supported 报告本平台是否有「按程序放行防火墙」这回事：Windows 有，其它平台没有。
+func Supported() bool { return true }
+
 // HandleCLI 处理提权后的子进程调用；返回 true 表示已经处理完，应直接退出。
 func HandleCLI() bool {
 	if len(os.Args) < 2 {

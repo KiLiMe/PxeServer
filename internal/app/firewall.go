@@ -6,6 +6,12 @@ import (
 	"pxeserv/internal/locales"
 )
 
+// FirewallSupported 报告当前平台是否需要「放行程序」：只有 Windows 需要。
+// 非 Windows 的防火墙按端口而不是按程序，界面据此把整块设置隐藏起来。
+func (a *App) FirewallSupported() bool {
+	return firewall.Supported()
+}
+
 func (a *App) FirewallState() string {
 	return firewall.State()
 }
