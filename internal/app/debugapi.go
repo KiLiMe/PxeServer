@@ -31,6 +31,7 @@ import (
 
 	"pxeserv/internal/config"
 	"pxeserv/internal/dhcp"
+	"pxeserv/internal/pxe"
 )
 
 type debugAPI struct {
@@ -209,7 +210,7 @@ func (a *App) dbgSelfTest(w http.ResponseWriter) {
 			if cfg.BootFileOption != "" && !back.IsIPXE() {
 				out["bootFile"] = cfg.BootFileOption
 			} else if back.IsIPXE() && cfg.MenuFile != "" {
-				out["bootFile"] = MenuURL(cfg)
+				out["bootFile"] = pxe.MenuURL(cfg)
 			} else {
 				out["bootFile"] = cfg.BootFileFor(art)
 			}

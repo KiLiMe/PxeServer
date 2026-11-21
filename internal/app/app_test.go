@@ -8,6 +8,7 @@ import (
 
 	"pxeserv/internal/config"
 	"pxeserv/internal/netif"
+	"pxeserv/internal/pxe"
 )
 
 func TestReadySummary(t *testing.T) {
@@ -38,35 +39,6 @@ func TestReadySummary(t *testing.T) {
 	}
 }
 
-func TestMenuURL(t *testing.T) {
-	cases := []struct {
-		name string
-		cfg  config.Config
-		want string
-	}{
-		{
-			"HTTP 80 端口省略端口且去前导斜杠",
-			config.Config{HTTPEnable: true, HTTPPort: 80, ServerIP: "192.168.5.1", MenuFile: "/menu.ipxe"},
-			"http://192.168.5.1/menu.ipxe",
-		},
-		{
-			"非 80 端口保留端口且优先 BootServerHost",
-			config.Config{HTTPEnable: true, HTTPPort: 8080, ServerIP: "192.168.5.1", NextServer: "192.168.5.2", BootServerHost: "192.168.5.3", MenuFile: "boot.ipxe"},
-			"http://192.168.5.3:8080/boot.ipxe",
-		},
-		{
-			"关闭 HTTP 时只返回文件名",
-			config.Config{HTTPEnable: false, HTTPPort: 80, ServerIP: "192.168.5.1", MenuFile: "/menu.ipxe"},
-			"menu.ipxe",
-		},
-	}
-	for _, tc := range cases {
-		if got := MenuURL(&tc.cfg); got != tc.want {
-			t.Errorf("%s：得到 %q，应为 %q", tc.name, got, tc.want)
-		}
-	}
-}
-
 func TestOtherSubnetHint(t *testing.T) {
 	cfg := &config.Config{ServerIP: "192.168.5.1", SubnetMask: "255.255.255.0"}
 	ifaces := []netif.Iface{
@@ -89,7 +61,7 @@ func TestLogsSinceAndStartReentry(t *testing.T) {
 	if _, _, ok := a.LogsSince(seq); ok {
 		t.Fatalf("无新日志时 LogsSince 应返回 ok=false")
 	}
-	a.running = true
+	a.services = &pxe.Services{}
 	if msg := a.StartServices(); msg != "" {
 		t.Fatalf("运行中重入 StartServices 返回意外错误: %q", msg)
 	}

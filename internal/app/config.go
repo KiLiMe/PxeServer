@@ -46,7 +46,7 @@ func (a *App) SaveConfig(c config.Config) string {
 		return err.Error()
 	}
 	a.mu.Lock()
-	wasRunning := a.running
+	wasRunning := a.services != nil
 	old := a.cfg
 	a.cfg = &c
 	a.mu.Unlock()

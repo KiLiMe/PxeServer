@@ -197,6 +197,10 @@ func (s *Server) Stop() {
 	if err := s.srv.Shutdown(ctx); err != nil {
 		_ = s.srv.Close()
 	}
+	if s.ln != nil {
+		// 若启动回滚发生在 Serve 之前，http.Server 还没有登记监听器。
+		_ = s.ln.Close()
+	}
 }
 
 // serveIndex 在 / 上输出一个简单首页：当前共享了哪些启动文件、挂了哪些 ISO。

@@ -3,9 +3,9 @@ package tftp
 import (
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/pin/tftp/v3"
@@ -18,6 +18,7 @@ type Server struct {
 	Root   string
 	logger logbook.Logger
 	srv    *tftp.Server
+	conn   *net.UDPConn
 }
 
 func New(root string, logger logbook.Logger) *Server {
@@ -39,17 +40,29 @@ func (s *Server) logf(level logbook.Level, format string, args ...any) {
 	s.logger(level, format, args...)
 }
 
-// Start blocks until the server stops.
-func (s *Server) Start() error {
-	s.logf(logbook.Info, "TFTPd：udp:69 → %s", s.Root)
-	err := s.srv.ListenAndServe(":69")
-	if err != nil && !strings.Contains(err.Error(), "closed") {
-		return fmt.Errorf("bind udp:69 (need admin?): %w", err)
+// Listen 同步绑定 TFTP 端口。
+func (s *Server) Listen() error {
+	conn, err := net.ListenUDP("udp", &net.UDPAddr{Port: 69})
+	if err != nil {
+		return err
 	}
+	s.conn = conn
 	return nil
 }
 
-func (s *Server) Stop() { s.srv.Shutdown() }
+// Serve 使用 Listen 已绑定的套接字，直到服务停止。
+func (s *Server) Serve() error {
+	s.logf(logbook.Info, "TFTPd：udp:69 → %s", s.Root)
+	return s.srv.Serve(s.conn)
+}
+
+func (s *Server) Stop() {
+	s.srv.Shutdown()
+	if s.conn != nil {
+		// 若启动回滚发生在 Serve 之前，第三方服务器还没有登记这个套接字。
+		_ = s.conn.Close()
+	}
+}
 
 // read handles RRQ. Each transfer gets its own ephemeral socket, which pin/tftp
 // manages for us - the listening socket only parses the request.

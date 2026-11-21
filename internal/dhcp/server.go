@@ -39,7 +39,8 @@ type Server struct {
 	cfg    *config.Config
 	logger logbook.Logger
 
-	mainConn *net.UDPConn // udp:67，绑在 server_ip 上（收+发都走这块网卡）
+	network  dhcpNetwork
+	mainConn *net.UDPConn // udp:67，收发使用 server_ip 对应的网卡
 	bootConn *net.UDPConn // udp:4011，ProxyDHCP 模式下应答 PXE 启动服务请求
 
 	extra  map[byte][]byte // 额外 DHCP 选项，来自主页的「额外 DHCP 选项」输入框
@@ -88,13 +89,12 @@ func bindUDP(addr string) (*net.UDPConn, error) {
 }
 
 func (s *Server) Start() error {
-	conn, err := bindUDP(net.JoinHostPort(s.cfg.ServerIP, "67"))
+	if err := s.setupNetwork(); err != nil {
+		return err
+	}
+	conn, err := s.bindService("67")
 	if err != nil {
-		conn, err = bindUDP(":67")
-		if err != nil {
-			return fmt.Errorf("DHCPd 绑定 udp:67 失败: %w", err)
-		}
-		s.logf(logbook.Warn, "DHCPd：%s 不是本机网卡地址，已退回监听 0.0.0.0:67；此时广播应答可能从错误网卡发出，请在界面里选对网卡", s.cfg.ServerIP)
+		return fmt.Errorf("绑定 udp:67 失败：%w", err)
 	}
 	s.mainConn = conn
 
@@ -129,10 +129,7 @@ func (s *Server) Start() error {
 	// 4011 发 "PXE boot server request"，没人应答它就直接报 "A boot image was not found"，
 	// 连一次 TFTP 都不会发起。两种模式都绑，成本只是一行日志。
 	{
-		boot, err := bindUDP(net.JoinHostPort(s.cfg.ServerIP, "4011"))
-		if err != nil {
-			boot, err = bindUDP(":4011")
-		}
+		boot, err := s.bindService("4011")
 		if err != nil {
 			s.logf(logbook.Warn, "DHCPd：PXE 启动服务 udp:4011 绑定失败（部分客户端会改走 67 应答）: %v", err)
 		} else {
@@ -189,7 +186,7 @@ func (s *Server) loop(conn *net.UDPConn, onBootService bool) {
 	defer s.wg.Done()
 	buf := make([]byte, 1500)
 	for {
-		n, from, err := conn.ReadFromUDP(buf)
+		n, from, err := s.network.read(conn, buf)
 		if err != nil {
 			select {
 			case <-s.stop:
@@ -654,7 +651,7 @@ func (s *Server) send(c *net.UDPConn, r *Packet, from *net.UDPAddr) {
 		payload := r.Marshal()
 		ok := false
 		for _, d := range s.broadcastDests() {
-			if _, err := c.WriteToUDP(payload, d); err == nil {
+			if err := s.network.write(c, payload, d); err == nil {
 				ok = true
 			} else {
 				s.logf(logbook.Error, "DHCPd：向 %s 发送应答失败：%v", d.IP, err)
@@ -665,7 +662,7 @@ func (s *Server) send(c *net.UDPConn, r *Packet, from *net.UDPAddr) {
 		}
 		return
 	}
-	if _, err := c.WriteToUDP(r.Marshal(), dst); err != nil {
+	if err := s.network.write(c, r.Marshal(), dst); err != nil {
 		s.logf(logbook.Error, "DHCPd：发送应答失败: %v", err)
 	}
 }

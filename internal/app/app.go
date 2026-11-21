@@ -10,10 +10,9 @@ import (
 	"pxeserv/internal/config"
 	"pxeserv/internal/dhcp"
 	"pxeserv/internal/firewall"
-	"pxeserv/internal/httpd"
 	"pxeserv/internal/locales"
 	"pxeserv/internal/netif"
-	"pxeserv/internal/tftp"
+	"pxeserv/internal/pxe"
 )
 
 type App struct {
@@ -24,11 +23,9 @@ type App struct {
 	cfgPath string
 	cfg     *config.Config
 
-	dhcpSrv *dhcp.Server
-	tftpSrv *tftp.Server
-	httpSrv *httpd.Server
-	running bool
-	debug   *debugAPI // 本地调试接口（仅由 -debug-port 打开，127.0.0.1 + 指定端口）
+	serviceMu sync.Mutex
+	services  *pxe.Services
+	debug     *debugAPI // 本地调试接口（仅由 -debug-port 打开，127.0.0.1 + 指定端口）
 	// debugPort 是命令行 -debug-port 传入的端口；0 表示不开调试接口。
 	debugPort int
 

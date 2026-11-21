@@ -23,6 +23,8 @@ sudo setcap 'cap_net_bind_service=+ep' ./build/bin/linux-amd64/pxeserver   # 然
 - 67 / 69 / 80 是特权端口：不 `setcap` 就得 `sudo` 跑，否则日志报 `bind: permission denied`，详见 [troubleshooting.md](troubleshooting.md) 第 6 节。
 - 界面「设置」里没有防火墙那一段：Linux 防火墙按端口管理，自己开 `dhcp` 服务与 `69/udp` 即可。
 - 单实例保护照旧，只是第二次启动只提示、不把窗口拉前台。
+- `server_ip` 必须是本机用于 PXE 的网卡 IPv4。Linux 按该网卡接收 DHCP 广播并发送应答，地址尚未配置时启动会报错。
+- `pxed` 在 TFTP 或已启用的 HTTP 端口绑定失败时以非零状态退出。启用 HTTP 时，桌面端和 `pxed` 都会在启动目录生成 `httpboot.ipxe` 供 `autoexec.ipxe` 跳转到 HTTP 菜单。使用 `pxed -no-http` 时，DHCP 下发以 TFTP 为基准的菜单文件名。
 
 ## 虚拟机实测
 

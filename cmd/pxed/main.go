@@ -10,10 +10,8 @@ import (
 	"syscall"
 
 	"pxeserv/internal/config"
-	"pxeserv/internal/dhcp"
-	"pxeserv/internal/httpd"
 	"pxeserv/internal/logbook"
-	"pxeserv/internal/tftp"
+	"pxeserv/internal/pxe"
 )
 
 // Version 由 -ldflags "-X main.Version=..." 注入（release.yml 用），未注入时标记成开发构建。
@@ -52,50 +50,22 @@ func main() {
 	if *root != "" {
 		cfg.TFTPRoot = *root
 	}
-	if err := os.MkdirAll(cfg.TFTPRoot, 0o755); err != nil {
-		fmt.Fprintln(os.Stderr, "启动目录：", err)
-		os.Exit(1)
+	if *noHTTP {
+		cfg.HTTPEnable = false
 	}
-	logf(logbook.Info, "配置：%s（ProxyDHCP=%v HTTP=%v 根目录=%s）", *cfgPath, cfg.ProxyDHCP, cfg.HTTPEnable && !*noHTTP, cfg.TFTPRoot)
-
-	dhcpSrv := dhcp.New(cfg, logf)
-	tftpSrv := tftp.New(cfg.TFTPRoot, logf)
-	var httpSrv *httpd.Server
-	if cfg.HTTPEnable && !*noHTTP {
-		httpSrv = httpd.New(cfg.TFTPRoot, cfg.HTTPPort, logf)
-	}
-	if httpSrv != nil {
-		go func() {
-			if err := httpSrv.Start(); err != nil {
-				logf(logbook.Error, "HTTPd：%v", err)
-			}
-		}()
-	}
-
-	go func() {
-		if err := tftpSrv.Start(); err != nil {
-			logf(logbook.Error, "TFTPd：%v", err)
-		}
-	}()
-	if err := dhcpSrv.Start(); err != nil {
-		tftpSrv.Stop()
-		if httpSrv != nil {
-			httpSrv.Stop()
-		}
-		fmt.Fprintln(os.Stderr, "DHCPd："+err.Error())
-		fmt.Fprintln(os.Stderr, "提示：udp:67 可能已被其他 DHCP 服务占用（路由器/另一个 PXE 服务）。")
-		os.Exit(1)
-	}
+	logf(logbook.Info, "配置：%s（ProxyDHCP=%v HTTP=%v 根目录=%s）", *cfgPath, cfg.ProxyDHCP, cfg.HTTPEnable, cfg.TFTPRoot)
 
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
+	defer signal.Stop(sig)
+	services, startErr := pxe.Start(cfg, logf)
+	if startErr != nil {
+		fmt.Fprintln(os.Stderr, startErr)
+		os.Exit(1)
+	}
 	<-sig
 	logf(logbook.Info, "正在停止服务…")
-	dhcpSrv.Stop()
-	tftpSrv.Stop()
-	if httpSrv != nil {
-		httpSrv.Stop()
-	}
+	services.Stop()
 }
 
 func loadOrCreate(path string) (*config.Config, error) {
