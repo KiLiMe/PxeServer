@@ -8,7 +8,10 @@
 go run ./cmd/pxed -selftest      # 1. 协议自检
 go run .                         # 2. 启动桌面端
 pwsh ./Scripts/build.ps1 -Test   # 3. 测试并构建 PxeServer.exe
-pwsh ./Scripts/build.ps1 -Target linux   # 4. 出 Linux 包（deb / rpm / PKGBUILD / tar.gz）
+```
+
+```bash
+./Scripts/build.sh -t            # Linux：测试并出 App / deb / rpm / PKGBUILD / tar.gz（不需要 PowerShell）
 ```
 
 ## 依赖环境
@@ -21,7 +24,7 @@ pwsh ./Scripts/build.ps1 -Target linux   # 4. 出 Linux 包（deb / rpm / PKGBUI
 | github.com/kdomanski/iso9660 | v0.4.0 |
 | github.com/pin/tftp/v3 | v3.2.0 |
 | golang.org/x/sys | v0.50.0 |
-| PowerShell（构建脚本） | 7+（Linux 也能装） |
+| PowerShell（构建脚本） | 7+（仅 Windows 构建 / CI 需要） |
 
 ## 许可
 

@@ -13,11 +13,13 @@ go run ./cmd/pxed             # 命令行版：立刻起服务，首次在当前
 ## 在 Linux 上运行
 
 ```bash
+./Scripts/build.sh                 # 构建：App + deb / rpm / PKGBUILD + tar.gz，出到 build/bin/linux-<arch>/（不需要 PowerShell）
 go run ./cmd/pxed -selftest        # 同一套自检，无需 root
 go run .                           # 桌面界面（需 GTK3 + WebKitGTK，发行版包名如 webkit2gtk-4.1）
-sudo setcap 'cap_net_bind_service=+ep' ./build/bin/pxeserver   # 然后就能普通用户起服务
+sudo setcap 'cap_net_bind_service=+ep' ./build/bin/linux-amd64/pxeserver   # 然后就能普通用户起服务
 ```
 
+- 构建脚本的完整参数（`-t` 跑测试、`-v` 写版本号、`-a` 换架构）与交叉构建见 [dev-release.md](dev-release.md) 的「本地构建」。
 - 67 / 69 / 80 是特权端口：不 `setcap` 就得 `sudo` 跑，否则日志报 `bind: permission denied`，详见 [troubleshooting.md](troubleshooting.md) 第 6 节。
 - 界面「设置」里没有防火墙那一段：Linux 防火墙按端口管理，自己开 `dhcp` 服务与 `69/udp` 即可。
 - 单实例保护照旧，只是第二次启动只提示、不把窗口拉前台。

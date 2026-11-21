@@ -43,6 +43,13 @@ jobs:
         shell: bash
         run: go vet ./internal/...
 
+      # build.sh 是 Linux 主构建入口，语法错了要当场抦下来。
+      - name: 构建脚本语法
+        shell: bash
+        run: |
+          bash -n Scripts/build.sh
+          command -v shellcheck >/dev/null && shellcheck -S warning Scripts/build.sh || true
+
       # 界面文案的访问器是生成物：catalog 改了没跑 generate 就会不一致。
       - name: 界面文案一致性
         shell: bash
