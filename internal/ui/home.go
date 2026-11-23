@@ -16,7 +16,12 @@ func (u *UI) home(c *ui.Context) {
 	// 特权端口那条要放在最上面：普通用户在 Linux 上必然绑不上 67/69，
 	// 与其让用户点完「启动」去日志里找 bind: permission denied，不如开机就说清楚。
 	if !u.privilegedOK && !u.status.Running {
-		hintBox(c, locales.PrivilegedPortHint(u.setcapHint()), msgWarn)
+		switch {
+		case u.privilegedGranted:
+			hintBox(c, locales.PrivilegedGrantedHint(), msgSuccess)
+		default:
+			hintBoxButton(c, locales.PrivilegedPortHint(u.setcapHint()), msgWarn, locales.PrivilegedGrant(), u.grantPrivileges)
+		}
 	}
 	section(c, locales.SectionServices(), func() {
 		ui.Checkbox(c, &u.cfg.ProxyDHCP, locales.ProxyDHCP())
@@ -97,6 +102,18 @@ func (u *UI) home(c *ui.Context) {
 		})
 		row(c, sf(c, locales.Option66(), &u.cfg.BootServerHost), sf(c, locales.Option67(), &u.cfg.BootFileOption), sf(c, locales.Option252(), &u.cfg.PrivateOption))
 		field(c, locales.ExtraOptions(), &u.cfg.ExtraOptions)
+	})
+}
+
+// grantPrivileges 走 pkexec 让用户在一次系统认证里完成授权：setcap 打在当前可执行文件上，
+// 之后普通用户启动就能绑 67/69。当前进程的 CapEff 不会因此改变，所以只把提示切成
+// 「重启后生效」，不动 privilegedOK——否则下一句「启动」就会撞回 bind 失败。
+func (u *UI) grantPrivileges() {
+	u.async(func() result {
+		if msg := u.app.GrantPrivilegedPorts(); msg != "" {
+			return failed(msg)
+		}
+		return notice(locales.PrivilegedGranted(), func() { u.privilegedGranted = true })
 	})
 }
 

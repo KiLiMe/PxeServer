@@ -49,6 +49,7 @@ type UI struct {
 	firewallQueried           bool
 	firewallSupported         bool // 当前平台有没有「按程序放行」这件事（只有 Windows 有）
 	privilegedOK              bool // 当前进程能不能绑定特权端口（只有 Linux 会为假）
+	privilegedGranted         bool // 本次运行里刚授权过：文件已有能力，但进程 CapEff 要重启才变
 	port, poolSize, leaseTime string
 	menu, archKey, archValue  string
 	pending                   []ui.Toast
@@ -204,9 +205,18 @@ func (u *UI) View(c *ui.Context) {
 
 // hintBox 是页面里的内联提示条（不是浮动通知），配色与 Toast 共用一张表。
 func hintBox(c *ui.Context, text string, kind int) {
+	hintBoxButton(c, text, kind, "", nil)
+}
+
+// hintBoxButton 是带一个补救按钮的提示条：按钮是文案里步骤的可点版本
+// （例如「一键授权」直接跑 setcap），label 为空时退化成普通的 hintBox。
+func hintBoxButton(c *ui.Context, text string, kind int, label string, on func()) {
 	bg, border := toastColors(toastType(kind))
-	ui.Row(c).FillWidth().Padding(8).Radius(6).Background(bg).Border(1, border).Children(func() {
-		ui.Text(c, text).Wrap()
+	ui.Row(c).FillWidth().Padding(8).Radius(6).Gap(10).AlignItems(ui.Center).Background(bg).Border(1, border).Children(func() {
+		ui.Text(c, text).Wrap().Grow(1)
+		if label != "" {
+			ui.Button(c, label).OnClick(on)
+		}
 	})
 }
 

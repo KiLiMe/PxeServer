@@ -69,3 +69,9 @@ func TestHasCap(t *testing.T) {
 		}
 	}
 }
+
+func TestGrantRejectsEmptyExe(t *testing.T) {
+	if err := Grant("  "); err == nil {
+		t.Fatal("空路径应当直接报错，而不是去跑 pkexec")
+	}
+}

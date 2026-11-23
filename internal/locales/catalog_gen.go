@@ -1726,6 +1726,46 @@ func (msgs Messages) PrivilegedPortBlocked(cmd string) string {
 	return Catalog.Format(msgs.locale, "privilegedPortBlocked", map[string]any{"cmd": cmd})
 }
 
+// PrivilegedGrant says "一键授权"
+// in the language the app shows.
+func PrivilegedGrant() string { return In(i18n.Locale()).PrivilegedGrant() }
+
+// PrivilegedGrant says "一键授权"
+// in the language of msgs.
+func (msgs Messages) PrivilegedGrant() string {
+	return Catalog.Format(msgs.locale, "privilegedGrant", nil)
+}
+
+// PrivilegedGranted says "已授予绑定特权端口的权限，重启本程序后生效。"
+// in the language the app shows.
+func PrivilegedGranted() string { return In(i18n.Locale()).PrivilegedGranted() }
+
+// PrivilegedGranted says "已授予绑定特权端口的权限，重启本程序后生效。"
+// in the language of msgs.
+func (msgs Messages) PrivilegedGranted() string {
+	return Catalog.Format(msgs.locale, "privilegedGranted", nil)
+}
+
+// PrivilegedGrantedHint says "已授予绑定特权端口的权限：本次运行仍没有该权限，重启本程序即可直接启动服务。"
+// in the language the app shows.
+func PrivilegedGrantedHint() string { return In(i18n.Locale()).PrivilegedGrantedHint() }
+
+// PrivilegedGrantedHint says "已授予绑定特权端口的权限：本次运行仍没有该权限，重启本程序即可直接启动服务。"
+// in the language of msgs.
+func (msgs Messages) PrivilegedGrantedHint() string {
+	return Catalog.Format(msgs.locale, "privilegedGrantedHint", nil)
+}
+
+// PrivilegedGrantFailed says "授权失败：{err}"
+// in the language the app shows.
+func PrivilegedGrantFailed(err string) string { return In(i18n.Locale()).PrivilegedGrantFailed(err) }
+
+// PrivilegedGrantFailed says "授权失败：{err}"
+// in the language of msgs.
+func (msgs Messages) PrivilegedGrantFailed(err string) string {
+	return Catalog.Format(msgs.locale, "privilegedGrantFailed", map[string]any{"err": err})
+}
+
 // ArchKeyInvalid says "架构号必须为非负整数（如 7、9、10）"
 // in the language the app shows.
 func ArchKeyInvalid() string { return In(i18n.Locale()).ArchKeyInvalid() }

@@ -41,7 +41,8 @@
   - `pxed` 在 `pxe.Start` 之前就往 stderr 打一行同样的提示（仍继续启动，后续错误处理不变）。
   - `setcap` 对已在运行的进程不生效，改完必须重启程序；`CapEff` 显示的是 effective 位，systemd 用 `AmbientCapabilities` 才能让这一位保留下来。
 - **解法**：任选一种——
-  - `sudo setcap 'cap_net_bind_service=+ep' /usr/bin/pxeserver`（或你解压/编译出来的路径），之后普通用户可直接运行；用 `.deb` / `.rpm` 装的升级后要重设。
+  - 点主页黄条右侧的「一键授权」：界面走 `pkexec`（polkit，桌面弹认证框）执行 `setcap`，能力打在当前可执行文件上。密码输完即可，但当前进程的 `CapEff` 不会变——**重启程序**才生效，所以黄条会换成一条绿色的「已授权，重启后生效」。无桌面（SSH / 无 polkit agent）时 `pkexec` 不可用，弹框会直接说清楚，回退到下一种手工方式。
+  - `sudo setcap 'cap_net_bind_service=+ep' /opt/pxeserver/pxeserver`（或你解压/编译出来的路径），之后普通用户可直接运行。用 `.deb` / `.rpm` / PKGBUILD 装的包在**安装与升级**时都已由包脚本自动授权（deb 的 `postinst`、rpm 的 `%post`、PKGBUILD 的 `post_install`/`post_upgrade`，由 `Scripts/patch-packages.sh` 注入），不用再手动跑 `setcap`。
   - `sudo ./pxeserver` / `sudo ./pxed`（注意 `config.json` 与 `PXE-server.log` 会落在当前目录，且归 root 所有）。
   - 用 systemd 服务并加 `AmbientCapabilities=CAP_NET_BIND_SERVICE`。
 - **附带**：Linux 的防火墙按端口而不是按程序，界面不提供「放行程序」；开着 firewalld 的发行版（Fedora / RHEL / openSUSE）要自己开：`sudo firewall-cmd --add-service=dhcp --add-port=69/udp --add-port=80/tcp`（HTTP 端口按你配的改）。ufw 同理：`sudo ufw allow 67/udp` 等。
