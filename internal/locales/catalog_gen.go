@@ -1716,14 +1716,34 @@ func (msgs Messages) ProxyPoolHint() string {
 	return Catalog.Format(msgs.locale, "proxyPoolHint", nil)
 }
 
-// PrivilegedPortHint says "当前进程没有绑定特权端口的权限：Linux 上 67/69（以及 HTTP 默认的 80）都在 1024 …"
+// PrivilegedPortHint says "缺少绑定特权端口的权限：67/69（以及 HTTP 默认的 80）都在 1024 以下。"
 // in the language the app shows.
-func PrivilegedPortHint(cmd string) string { return In(i18n.Locale()).PrivilegedPortHint(cmd) }
+func PrivilegedPortHint() string { return In(i18n.Locale()).PrivilegedPortHint() }
 
-// PrivilegedPortHint says "当前进程没有绑定特权端口的权限：Linux 上 67/69（以及 HTTP 默认的 80）都在 1024 …"
+// PrivilegedPortHint says "缺少绑定特权端口的权限：67/69（以及 HTTP 默认的 80）都在 1024 以下。"
 // in the language of msgs.
-func (msgs Messages) PrivilegedPortHint(cmd string) string {
-	return Catalog.Format(msgs.locale, "privilegedPortHint", map[string]any{"cmd": cmd})
+func (msgs Messages) PrivilegedPortHint() string {
+	return Catalog.Format(msgs.locale, "privilegedPortHint", nil)
+}
+
+// PrivilegedCopyCmd says "复制命令"
+// in the language the app shows.
+func PrivilegedCopyCmd() string { return In(i18n.Locale()).PrivilegedCopyCmd() }
+
+// PrivilegedCopyCmd says "复制命令"
+// in the language of msgs.
+func (msgs Messages) PrivilegedCopyCmd() string {
+	return Catalog.Format(msgs.locale, "privilegedCopyCmd", nil)
+}
+
+// PrivilegedCopyCmdDone says "setcap 命令已复制"
+// in the language the app shows.
+func PrivilegedCopyCmdDone() string { return In(i18n.Locale()).PrivilegedCopyCmdDone() }
+
+// PrivilegedCopyCmdDone says "setcap 命令已复制"
+// in the language of msgs.
+func (msgs Messages) PrivilegedCopyCmdDone() string {
+	return Catalog.Format(msgs.locale, "privilegedCopyCmdDone", nil)
 }
 
 // PrivilegedPortBlocked says "未启动：当前进程不能绑定 67/69 这类特权端口。请先执行 {cmd}（或 sudo 运行、或用 systemd…"

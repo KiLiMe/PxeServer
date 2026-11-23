@@ -20,9 +20,14 @@ func (u *UI) home(c *ui.Context) {
 		case u.privilegedGranted:
 			// 授权只改了文件，能力要下一次 exec 才进 CapEff：这里直接给「立即重启」，
 			// 免得用户看完「重启后生效」还得自己关窗口、再去菜单里重新打开。
-			hintBoxButton(c, locales.PrivilegedGrantedHint(), msgSuccess, locales.PrivilegedRestart(), u.restartApp)
+			hintBoxActions(c, locales.PrivilegedGrantedHint(), msgSuccess,
+				hintAction{locales.PrivilegedRestart(), u.restartApp})
 		default:
-			hintBoxButton(c, locales.PrivilegedPortHint(u.setcapHint()), msgWarn, locales.PrivilegedGrant(), u.grantPrivileges)
+			// 提示条只留一句结论：三种解法的完整说明在「启动」被拦下的弹框里，
+			// 命令给一个「复制命令」按钮，SSH / 没有 polkit 的用户拿去终端贴。
+			hintBoxActions(c, locales.PrivilegedPortHint(), msgWarn,
+				hintAction{locales.PrivilegedGrant(), u.grantPrivileges},
+				hintAction{locales.PrivilegedCopyCmd(), u.copySetcapHint})
 		}
 	}
 	section(c, locales.SectionServices(), func() {
@@ -117,6 +122,13 @@ func (u *UI) grantPrivileges() {
 		}
 		return notice(locales.PrivilegedGranted(), func() { u.privilegedGranted = true })
 	})
+}
+
+// copySetcapHint 把手工命令放进剪贴板：没装 polkit（SSH、精简桌面）时
+// 「一键授权」不可用，用户至少要能一键拿到命令去终端里贴。
+func (u *UI) copySetcapHint() {
+	mygo.Clipboard.WriteText(u.setcapHint())
+	u.setMsg(msgSuccess, locales.PrivilegedCopyCmdDone())
 }
 
 // restartApp 先存配置再替换进程：重启会丢掉界面上没保存的编辑，

@@ -205,17 +205,23 @@ func (u *UI) View(c *ui.Context) {
 
 // hintBox 是页面里的内联提示条（不是浮动通知），配色与 Toast 共用一张表。
 func hintBox(c *ui.Context, text string, kind int) {
-	hintBoxButton(c, text, kind, "", nil)
+	hintBoxActions(c, text, kind)
 }
 
-// hintBoxButton 是带一个补救按钮的提示条：按钮是文案里步骤的可点版本
-// （例如「一键授权」直接跑 setcap），label 为空时退化成普通的 hintBox。
-func hintBoxButton(c *ui.Context, text string, kind int, label string, on func()) {
+// hintAction 是提示条右侧的补救按钮：把文案里的一步做成可点的。
+type hintAction struct {
+	label string
+	on    func()
+}
+
+// hintBoxActions 是带补救按钮的提示条（按钮最多两个，多了挤不下）。
+// 文案要短：长解释留给弹框与文档，提示条只留一句结论。
+func hintBoxActions(c *ui.Context, text string, kind int, actions ...hintAction) {
 	bg, border := toastColors(toastType(kind))
 	ui.Row(c).FillWidth().Padding(8).Radius(6).Gap(10).AlignItems(ui.Center).Background(bg).Border(1, border).Children(func() {
 		ui.Text(c, text).Wrap().Grow(1)
-		if label != "" {
-			ui.Button(c, label).OnClick(on)
+		for _, a := range actions {
+			ui.Button(c, a.label).OnClick(a.on)
 		}
 	})
 }

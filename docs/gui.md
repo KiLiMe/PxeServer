@@ -16,7 +16,7 @@
 
 顶部含状态徽章、启动 / 停止 / 保存配置按钮（有未保存改动时显示 `● 未保存`）；操作结果以底部浮层（Toast）提示。
 
-Linux 上如果当前进程没有 `CAP_NET_BIND_SERVICE`（普通用户默认如此），主页顶部会常驻一条警告，写明三种解法并给出可直接复制的 `sudo setcap 'cap_net_bind_service=+ep' <当前程序路径>`；黄条右侧的「一键授权」按钮走 `pkexec`（弹 polkit 认证框）把能力打到当前可执行文件上，成功后黄条换成绿条，右侧是「立即重启」——点了就存配置并原地重启（`syscall.Exec` 自己，同一个 PID），不必手动关窗口。此时点「启动」会被直接拦下并弹出同一条提示（配置照常保存），不会等服务绑定失败。这条提示在服务运行中自动隐藏，检测逻辑在 `internal/priv`，见 [troubleshooting.md](troubleshooting.md) 第 6 节。
+Linux 上如果当前进程没有 `CAP_NET_BIND_SERVICE`（普通用户默认如此），主页顶部会常驻一条警告，只写一句结论：67/69（以及 HTTP 默认的 80）都在 1024 以下。右侧两个按钮——「一键授权」走 `pkexec`（弹 polkit 认证框）把能力打到当前可执行文件上，「复制命令」把 `sudo setcap 'cap_net_bind_service=+ep' <当前程序路径>` 塞进剪贴板（SSH / 没装 polkit 时用）；成功后黄条换成绿条，右侧是「立即重启」——点了就存配置并原地重启（`syscall.Exec` 自己，同一个 PID），不必手动关窗口。此时点「启动」会被直接拦下并弹出同一条提示（配置照常保存），不会等服务绑定失败。这条提示在服务运行中自动隐藏，检测逻辑在 `internal/priv`，见 [troubleshooting.md](troubleshooting.md) 第 6 节。
 
 主页「启动与 DHCP 选项」还包含：Option 17 根路径、Option 60 ClassID、Option 66/67 覆盖值、Option 252、额外选项、Option 43 子项 1、EFI 不发 Option 43、自动启动服务。
 
