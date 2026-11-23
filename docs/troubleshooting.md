@@ -52,3 +52,10 @@
 - **现象**：Windows 上点「启动」后弹「DHCP 服务启动失败」，正文含 `无法绑定 192.168.5.1:67（请确认「服务器 IP」是本机某块网卡上的地址）：listen udp4 … bind: …`。
 - **原因**：`config.json` 里的 `server_ip` 已不属于本机任何一块网卡——网卡 IP 被路由器重分、网卡被禁用/拔出、配置文件从别的机器拷来，或手工改过。服务端**不会**退回监听 `0.0.0.0:67`：那样虽然能绑上，但应答里的 Option 54 / Option 66 仍是这个地址，客户端会一直卡在 `Configuring`，比直接报错更难查。
 - **解法**：回主页在「网卡」下拉里重新选择本机网卡（会同步 `server_ip` 与广播地址），保存后重启服务；或直接编辑 `config.json` 的 `server_ip`。
+
+## 8. Linux 点「选择目录」没反应，程序随后退出
+
+- **现象**：KDE 等桌面点「选择目录」后目录选择器始终不出现，过一会儿窗口消失；`journalctl --user` 里能看到
+  `Gtk:ERROR:../gtk/gtk/gtkfilechoosernativeportal.c:532:gtk_file_chooser_native_portal_hide: assertion failed: (data != NULL)` 与 `Bail out!`。
+- **原因**：可执行文件带 `cap_net_bind_service`（「一键授权」或 `setcap` 打上去的），而 `GTK_USE_PORTAL=1` 会让选择器改走桌面门户。`xdg-desktop-portal` 拒绝为带能力的进程服务——日志里是 `Portal operation not allowed: Unable to open /proc/<pid>/root`——门户选择器根本建不出来，GTK 在收尾时又断言失败，进程直接 `SIGABRT`。
+- **解法**：不要设 `GTK_USE_PORTAL=1`（程序自己也不再设置它，选择器用的是 GTK 内建对话框）。如果环境里已经设了，`env -u GTK_USE_PORTAL ./pxeserver` 启动即可。带 `cap_net_bind_service` 的文件不要指望门户类对话框。
