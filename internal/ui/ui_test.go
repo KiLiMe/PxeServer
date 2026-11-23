@@ -78,6 +78,11 @@ func TestIfaceLabelMarksUnconnected(t *testing.T) {
 	if got := ifaceLabel(down); !strings.Contains(got, locales.IfaceDown()) {
 		t.Fatalf("未连接的网卡应标注：%q", got)
 	}
+	// 没配 IPv4 的网卡不能拼出「名字 ·」（空分隔符），要另给标注。
+	bare := netif.Iface{Name: "以太网 3", Up: true}
+	if got := ifaceLabel(bare); strings.Contains(got, " · ") || !strings.Contains(got, locales.IfaceNoAddr()) {
+		t.Fatalf("无 IPv4 的网卡标注异常：%q", got)
+	}
 }
 
 func TestNativeMenuPathBinding(t *testing.T) {

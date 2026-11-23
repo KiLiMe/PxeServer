@@ -119,10 +119,17 @@ func (u *UI) grantPrivileges() {
 
 // ifaceLabel 是网卡在下拉里的显示名：没有链路的网卡照样列出、照样可选，
 // 但在后面标注「未连接」，免得把没插网线的适配器当成能用的那个。
+// 没配 IPv4 时不能拼成「名字 ·」（尾巴挂个空分隔符），改标注「无 IPv4」。
 func ifaceLabel(i netif.Iface) string {
-	label := i.Name + " · " + i.IP
-	if !i.Up {
+	label := i.Name
+	if i.IP != "" {
+		label += " · " + i.IP
+	}
+	switch {
+	case !i.Up:
 		label += "（" + locales.IfaceDown() + "）"
+	case i.IP == "":
+		label += "（" + locales.IfaceNoAddr() + "）"
 	}
 	return label
 }

@@ -294,6 +294,16 @@ func (msgs Messages) IfaceDown() string {
 	return Catalog.Format(msgs.locale, "ifaceDown", nil)
 }
 
+// IfaceNoAddr says "无 IPv4"
+// in the language the app shows.
+func IfaceNoAddr() string { return In(i18n.Locale()).IfaceNoAddr() }
+
+// IfaceNoAddr says "无 IPv4"
+// in the language of msgs.
+func (msgs Messages) IfaceNoAddr() string {
+	return Catalog.Format(msgs.locale, "ifaceNoAddr", nil)
+}
+
 // Rescan says "重新扫描"
 // in the language the app shows.
 func Rescan() string { return In(i18n.Locale()).Rescan() }

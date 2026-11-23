@@ -6,7 +6,7 @@ import "net"
 
 // Iface 是界面「网卡」下拉里的一项。
 // 直接选网卡就能自动填好 Option 54 / 掩码 / 广播地址，不用手敲。
-// Up=false 表示这块网卡当前没有链路（网线未插 / 已被禁用）：照样列出来，
+// Up=false 表示这块网卡当前没有链路（网线未插 / 被禁用）：照样列出来，
 // 方便先把地址配好（比如换机器前预填 192.168.5.1），插上网线后直接可用。
 type Iface struct {
 	Name      string `json:"name"`
@@ -30,7 +30,7 @@ func List() []Iface {
 		if ifi.Flags&net.FlagLoopback != 0 || ifi.Name == "" {
 			continue
 		}
-		up := ifi.Flags&net.FlagUp != 0
+		up := linkUp(ifi.Flags)
 		mac := ifi.HardwareAddr.String()
 		found := false
 		if addrs, err := ifi.Addrs(); err == nil {
@@ -65,6 +65,15 @@ func List() []Iface {
 		out = append(out, Iface{Name: ifi.Name, MAC: mac, Up: up})
 	}
 	return out
+}
+
+// linkUp 报告网卡是不是真的「连着线」。
+// net.FlagUp 对应 IFF_UP，那是管理状态：网线拔着、carrier=0 的网口只要被
+// NetworkManager / systemd-networkd 设成 up，这一位依然为真（本机 enp3s0 就是这样），
+// 拿它判断会误报成已连接。有载波时内核会同时置 IFF_RUNNING（net.FlagRunning），
+// 两个一起看才对得上用户眼里「插没插网线」。
+func linkUp(flags net.Flags) bool {
+	return flags&net.FlagUp != 0 && flags&net.FlagRunning != 0
 }
 
 // Broadcast 由地址和掩码算广播地址。

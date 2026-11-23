@@ -43,3 +43,22 @@ func TestBroadcast(t *testing.T) {
 		t.Fatalf("Broadcast(nil) = %s，期望 0.0.0.0", got)
 	}
 }
+
+// TestLinkUp 校验「连着线」的判据：IFF_UP 只是管理状态，还要有 IFF_RUNNING（载波）。
+func TestLinkUp(t *testing.T) {
+	cases := []struct {
+		name  string
+		flags net.Flags
+		want  bool
+	}{
+		{"插着网线", net.FlagUp | net.FlagRunning | net.FlagBroadcast, true},
+		{"管理 up 但没载波（网线拔了）", net.FlagUp | net.FlagBroadcast, false},
+		{"有载波但被管理员关掉", net.FlagRunning, false},
+		{"都没有", 0, false},
+	}
+	for _, c := range cases {
+		if got := linkUp(c.flags); got != c.want {
+			t.Errorf("%s：得到 %v，应为 %v", c.name, got, c.want)
+		}
+	}
+}

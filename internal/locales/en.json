@@ -31,6 +31,7 @@
   "ifaceNoIPv4": "This interface has no usable IPv4 address and mask; the network settings are unchanged.",
   "ifaceApplied": "Filled the network settings from the interface {name}. Click Save configuration to apply them.",
   "ifaceDown": "Not connected",
+  "ifaceNoAddr": "no IPv4",
   "rescan": "Rescan",
   "detectIP": "Detect local IP",
   "applyIface": "Use this interface",

@@ -42,11 +42,13 @@ func TestReadySummary(t *testing.T) {
 func TestOtherSubnetHint(t *testing.T) {
 	cfg := &config.Config{ServerIP: "192.168.5.1", SubnetMask: "255.255.255.0"}
 	ifaces := []netif.Iface{
-		{Name: "LAN", IP: "192.168.5.2", Mask: "255.255.255.0"},
-		{Name: "Wi-Fi", IP: "10.0.0.8", Mask: "255.255.255.0"},
+		{Name: "LAN", IP: "192.168.5.2", Mask: "255.255.255.0", Up: true},
+		{Name: "Wi-Fi", IP: "10.0.0.8", Mask: "255.255.255.0", Up: true},
+		// 没插网线的网卡上不会有客户端，不该出现在提示里。
+		{Name: "LAN2", IP: "172.16.0.9", Mask: "255.255.255.0", Up: false},
 	}
 	got := otherSubnetHint(ifaces, cfg)
-	if !strings.Contains(got, "Wi-Fi=10.0.0.8") || strings.Contains(got, "LAN=") {
+	if !strings.Contains(got, "Wi-Fi=10.0.0.8") || strings.Contains(got, "LAN=") || strings.Contains(got, "172.16.0.9") {
 		t.Fatalf("otherSubnetHint = %q", got)
 	}
 }

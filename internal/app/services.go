@@ -68,6 +68,10 @@ func otherSubnetHint(list []netif.Iface, cfg *config.Config) string {
 	}
 	var others []string
 	for _, it := range list {
+		// 没插网线的网卡上不会有客户端，拿它凑「还有别的网段」只会让人白查。
+		if !it.Up {
+			continue
+		}
 		ip := net.ParseIP(it.IP).To4()
 		m := net.ParseIP(it.Mask).To4()
 		if ip == nil || m == nil {
