@@ -41,7 +41,7 @@
   - `pxed` 在 `pxe.Start` 之前就往 stderr 打一行同样的提示（仍继续启动，后续错误处理不变）。
   - `setcap` 对已在运行的进程不生效，改完必须重启程序；`CapEff` 显示的是 effective 位，systemd 用 `AmbientCapabilities` 才能让这一位保留下来。
 - **解法**：任选一种——
-  - 点主页黄条右侧的「一键授权」：界面走 `pkexec`（polkit，桌面弹认证框）执行 `setcap`，能力打在当前可执行文件上。密码输完即可，但当前进程的 `CapEff` 不会变——**重启程序**才生效，所以黄条会换成一条绿色的「已授权，重启后生效」。无桌面（SSH / 无 polkit agent）时 `pkexec` 不可用，弹框会直接说清楚，回退到下一种手工方式。
+  - 点主页黄条右侧的「一键授权」：界面走 `pkexec`（polkit，桌面弹认证框）执行 `setcap`，能力打在当前可执行文件上。密码输完即可，但当前进程的 `CapEff` 不会变——要下一次 `exec` 才生效，所以黄条换成绿条并在右侧给出「立即重启」（先存配置，再 `syscall.Exec` 自己，同一 PID）。授权后会用 `getcap` 复核文件：容器 / overlayfs / 网络文件系统上 `setcap` 可能“成功”却没写进 xattr，这时会直接报「文件上没有该能力」，而不是让你重启完再撞一次 `bind: permission denied`。文件已经带能力时按钮不再弹认证框，点了直接成功。无桌面（SSH / 无 polkit agent）时 `pkexec` 不可用，弹框会直接说清楚，回退到下一种手工方式。
   - `sudo setcap 'cap_net_bind_service=+ep' /opt/pxeserver/pxeserver`（或你解压/编译出来的路径），之后普通用户可直接运行。用 `.deb` / `.rpm` / PKGBUILD 装的包在**安装与升级**时都已由包脚本自动授权（deb 的 `postinst`、rpm 的 `%post`、PKGBUILD 的 `post_install`/`post_upgrade`，由 `Scripts/patch-packages.sh` 注入），不用再手动跑 `setcap`。
   - `sudo ./pxeserver` / `sudo ./pxed`（注意 `config.json` 与 `PXE-server.log` 会落在当前目录，且归 root 所有）。
   - 用 systemd 服务并加 `AmbientCapabilities=CAP_NET_BIND_SERVICE`。

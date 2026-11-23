@@ -1756,14 +1756,36 @@ func (msgs Messages) PrivilegedGranted() string {
 	return Catalog.Format(msgs.locale, "privilegedGranted", nil)
 }
 
-// PrivilegedGrantedHint says "已授予绑定特权端口的权限：本次运行仍没有该权限，重启本程序即可直接启动服务。"
+// PrivilegedGrantedHint says "…"
 // in the language the app shows.
 func PrivilegedGrantedHint() string { return In(i18n.Locale()).PrivilegedGrantedHint() }
 
-// PrivilegedGrantedHint says "已授予绑定特权端口的权限：本次运行仍没有该权限，重启本程序即可直接启动服务。"
+// PrivilegedGrantedHint says "…"
 // in the language of msgs.
 func (msgs Messages) PrivilegedGrantedHint() string {
 	return Catalog.Format(msgs.locale, "privilegedGrantedHint", nil)
+}
+
+// PrivilegedRestart says "立即重启"
+// in the language the app shows.
+func PrivilegedRestart() string { return In(i18n.Locale()).PrivilegedRestart() }
+
+// PrivilegedRestart says "立即重启"
+// in the language of msgs.
+func (msgs Messages) PrivilegedRestart() string {
+	return Catalog.Format(msgs.locale, "privilegedRestart", nil)
+}
+
+// PrivilegedRestartFailed says "重启失败：{err}"
+// in the language the app shows.
+func PrivilegedRestartFailed(err string) string {
+	return In(i18n.Locale()).PrivilegedRestartFailed(err)
+}
+
+// PrivilegedRestartFailed says "重启失败：{err}"
+// in the language of msgs.
+func (msgs Messages) PrivilegedRestartFailed(err string) string {
+	return Catalog.Format(msgs.locale, "privilegedRestartFailed", map[string]any{"err": err})
 }
 
 // PrivilegedGrantFailed says "授权失败：{err}"

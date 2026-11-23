@@ -18,7 +18,9 @@ func (u *UI) home(c *ui.Context) {
 	if !u.privilegedOK && !u.status.Running {
 		switch {
 		case u.privilegedGranted:
-			hintBox(c, locales.PrivilegedGrantedHint(), msgSuccess)
+			// 授权只改了文件，能力要下一次 exec 才进 CapEff：这里直接给「立即重启」，
+			// 免得用户看完「重启后生效」还得自己关窗口、再去菜单里重新打开。
+			hintBoxButton(c, locales.PrivilegedGrantedHint(), msgSuccess, locales.PrivilegedRestart(), u.restartApp)
 		default:
 			hintBoxButton(c, locales.PrivilegedPortHint(u.setcapHint()), msgWarn, locales.PrivilegedGrant(), u.grantPrivileges)
 		}
@@ -114,6 +116,21 @@ func (u *UI) grantPrivileges() {
 			return failed(msg)
 		}
 		return notice(locales.PrivilegedGranted(), func() { u.privilegedGranted = true })
+	})
+}
+
+// restartApp 先存配置再替换进程：重启会丢掉界面上没保存的编辑，
+// 而 setcap 只有下一次 exec 才生效。成功后进程已被新镜像替换，不会返回。
+func (u *UI) restartApp() {
+	cfg := u.cfg.Clone()
+	u.async(func() result {
+		if msg := u.app.SaveConfig(*cfg); msg != "" {
+			return failed(msg)
+		}
+		if err := u.app.Restart(); err != nil {
+			return failed(locales.PrivilegedRestartFailed(err.Error()))
+		}
+		return done(nil)
 	})
 }
 
