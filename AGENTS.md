@@ -9,7 +9,7 @@
 | `main.go` | 唯一的主包文件：mygo 启动、窗口装配、提权分支（`-capture` 截图） |
 | `deps_test.go` | 依赖方向的机械校验（`go list` + 源码扫描） |
 | `cmd/pxed/main.go` | 无界面入口；`cmd/pxed/helpers.go` 为 `-selftest` 自检 |
-| `internal/app/app.go` | `App`：生命周期、`Status`、关于信息；同目录 `services.go` 起停服务、`config.go` 配置持久化、`menu.go` 菜单读写、`logs.go` 日志、`dialogs.go` 文件与目录选择、`firewall.go` 防火墙包装、`debugapi.go` 本地调试接口（仅 `-debug-port` 开启，只监听 `127.0.0.1`） |
+| `internal/app/app.go` | `App`：生命周期、`Status`、关于信息；同目录 `services.go` 起停服务、`config.go` 配置持久化、`menu.go` 菜单读写、`logs.go` 日志、`dialogs.go` 文件与目录选择、`picker_{linux,other}.go` 按桌面挑目录选择器（`kdialog` / `zenity`，都没有就用 mygo 的 GTK 对话框）、`firewall.go` 防火墙包装、`debugapi.go` 本地调试接口（仅 `-debug-port` 开启，只监听 `127.0.0.1`） |
 | `internal/ui/` | mygo 原生界面：`ui.go` 是状态、调度与通用控件，`home.go`/`settings.go`/`menu.go`/`arch.go`/`logs.go`/`leases.go`/`about.go` 每页一个文件（只调 `App` 的导出方法） |
 | `internal/config/config.go` | `Config`（字段 = 界面控件）、IP 探测；`path.go` 为 `DefaultPath()` |
 | `internal/config/extra.go` | 额外 DHCP 选项解析 |

@@ -58,4 +58,4 @@
 - **现象**：KDE 等桌面点「选择目录」后目录选择器始终不出现，过一会儿窗口消失；`journalctl --user` 里能看到
   `Gtk:ERROR:../gtk/gtk/gtkfilechoosernativeportal.c:532:gtk_file_chooser_native_portal_hide: assertion failed: (data != NULL)` 与 `Bail out!`。
 - **原因**：可执行文件带 `cap_net_bind_service`（「一键授权」或 `setcap` 打上去的），而 `GTK_USE_PORTAL=1` 会让选择器改走桌面门户。`xdg-desktop-portal` 拒绝为带能力的进程服务——日志里是 `Portal operation not allowed: Unable to open /proc/<pid>/root`——门户选择器根本建不出来，GTK 在收尾时又断言失败，进程直接 `SIGABRT`。
-- **解法**：不要设 `GTK_USE_PORTAL=1`（程序自己也不再设置它，选择器用的是 GTK 内建对话框）。如果环境里已经设了，`env -u GTK_USE_PORTAL ./pxeserver` 启动即可。带 `cap_net_bind_service` 的文件不要指望门户类对话框。
+- **解法**：不要设 `GTK_USE_PORTAL=1`（程序自己也不再设置它）。`XDG_CURRENT_DESKTOP` 认得出的桌面会用原生选择器：KDE / LXQt / DDE 用 `kdialog`，GNOME / XFCE / Cinnamon 等 GTK 桌面用 `zenity`；两者都没装（或桌面不认识）时用 GTK 内建对话框，功能一样、只是外观不跟随桌面。如果环境里已经设了 `GTK_USE_PORTAL`，`env -u GTK_USE_PORTAL ./pxeserver` 启动即可。带 `cap_net_bind_service` 的文件不要指望门户类对话框。
