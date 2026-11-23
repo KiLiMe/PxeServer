@@ -4,7 +4,7 @@
 
 Windows（或任意平台交叉构建，需要 PowerShell 7）：
 
-默认只编译能直接跑的那一个文件；要发版产物（.desktop、图标、deb / rpm / PKGBUILD、tar.gz）才加 `-Package` / `-p`。
+默认只出「能直接跑」的那一份：Linux 是 `build/bin/linux-<arch>/`（`pxeserver` + `.desktop` + 图标 + `.mygo-files`，与 wt-go 的 `build/linux-<arch>/` 同构），deb / rpm / PKGBUILD / install.sh / tar.gz 与 256/512 图标当场删掉。要发版产物才加 `-p` / `-Package`。
 
 ```pwsh
 pwsh ./Scripts/build.ps1 -Test                          # go vet + go test，再出 build/bin/PxeServer.exe
@@ -16,7 +16,7 @@ pwsh ./Scripts/build.ps1 -Target linux -Package -Version 0.2.0   # 发行物：A
 Linux（**不需要 PowerShell**，`Scripts/build.sh` 是 `build.ps1 -Target linux` 的等价物，`-p` 对应 `-Package`）：
 
 ```bash
-./Scripts/build.sh -t                 # go vet + go test，再 go build 出 build/bin/linux-<arch>/pxeserver
+./Scripts/build.sh -t                 # go vet + go test，再出 build/bin/linux-<arch>/ 的 App
 ./Scripts/build.sh                    # 同上，不跑测试
 ./Scripts/build.sh -p                 # 发行物：App / .desktop / 图标 / deb / rpm / PKGBUILD / tar.gz
 ./Scripts/build.sh -p -v 0.2.0-rc.1   # 临时改 mygo.json 版本号，包名与 metadata 跟着变，构建后还原
@@ -25,7 +25,7 @@ Linux（**不需要 PowerShell**，`Scripts/build.sh` 是 `build.ps1 -Target lin
 
 命令行版：`go build -o build/bin/pxed ./cmd/pxed`（Windows 加 `.exe`）。
 
-- 默认（不带 `-p` / `-Package`）是开发构建：只 `go build` 出本机可执行文件，不生成 `.desktop`、图标和任何包——本机调试只需要一个能跑的二进制。`-v` / `-Version` 只在发行构建里生效，单独给会被忽略并提示。发版与 CI 必须带 `-p`（`build.ps1` 是 `-Package`）。
+- 默认（不带 `-p` / `-Package`）是开发构建：mygo 照旧出 App 目录，随后删掉包装与多尺寸图标，只留 `pxeserver`、`pxeserver.desktop`、`pxeserver.png` 和 `.mygo-files`——本机调试就只要这些。`-v` / `-Version` 只在发行构建里生效，单独给会被忽略并提示。发版与 CI 必须带 `-p`（`build.ps1` 是 `-Package`）。
 - `build.ps1` 的 `-Target windows|linux`（默认 `windows`）与 `-Arch`（默认跟随 `go env GOARCH`）选择产物，两个平台都能从任意平台交叉构建；Windows 目标本来就只有 exe 一个文件，`-Package` 对它无影响。`build.sh` 只管 Linux：参数写错、版本号不是 `X.Y.Z` 开头都在干活前就报错退出，版本号改写由 `trap` 在退出时还原，构建失败也不留脏改动。
 - 两个脚本的产物约定一致：全部落在 `build/bin/`，Linux 在 `build/bin/linux-<arch>/`，`release.yml` 直接取用。改一边的行为要同步另一边。
 - Linux 发行构建（`-p`）一次产出：可执行文件 `pxeserver`、`pxeserver.desktop`、图标、`pxeserver_<版本>_amd64.deb`、`pxeserver-<版本>-1.x86_64.rpm`、`pxeserver-<版本>-linux-amd64.tar.gz`（内含 `install.sh`，解压后装到 `~/.local`）与 `PKGBUILD`。版本号里的 `-rc.1` 在 deb / rpm 里写成 `~rc.1`（包管理器认的排序写法），tar.gz 保持原样。

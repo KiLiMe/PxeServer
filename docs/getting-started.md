@@ -13,7 +13,7 @@ go run ./cmd/pxed             # 命令行版：立刻起服务，首次在当前
 ## 在 Linux 上运行
 
 ```bash
-./Scripts/build.sh                 # 本机构建：只出 build/bin/linux-<arch>/pxeserver（加 -p 才出 deb / rpm / PKGBUILD / tar.gz）
+./Scripts/build.sh                 # 本机构建：出 build/bin/linux-<arch>/ 的 App（pxeserver + .desktop + 图标），-p 才出 deb / rpm / PKGBUILD / tar.gz
 go run ./cmd/pxed -selftest        # 同一套自检，无需 root
 go run .                           # 桌面界面（需 GTK3 + WebKitGTK，发行版包名如 webkit2gtk-4.1）
 sudo setcap 'cap_net_bind_service=+ep' ./build/bin/linux-amd64/pxeserver   # 然后就能普通用户起服务

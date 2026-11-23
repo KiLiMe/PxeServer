@@ -2,9 +2,10 @@
 [CmdletBinding()]
 param(
     [switch]$Test,
-    # 发行构建：Linux 才加上 .desktop / 图标 / deb / rpm / PKGBUILD / tar.gz（与 build.sh -p 等价）。
-    # 默认只编译能直接跑的东西：Windows 出 PxeServer.exe（mygo 写图标与版本资源，本来就是一个文件），
-    # Linux 出 build/bin/linux-<arch>/pxeserver。Windows 没有包，-Package 对它无效。
+    # 发行构建：Linux 才加上 deb / rpm / PKGBUILD / tar.gz（与 build.sh -p 等价）。
+    # 默认只出能直接跑的 App 目录：Windows 是 PxeServer.exe 一个文件，Linux 是
+    # build/bin/linux-<arch>/（pxeserver + .desktop + 图标 + .mygo-files）。
+    # Windows 没有包，-Package 对它无效。
     [switch]$Package,
     [string]$Version,
     # 目标平台：windows 出单文件 PxeServer.exe；linux 默认出单文件 pxeserver，加 -Package 才出 App、
@@ -77,19 +78,20 @@ try {
         $suffix = if ($fileVersion) { "（exe 版本 $fileVersion）" } else { '' }
         Write-Host "构建完成：$output$suffix"
     } elseif (-not $Package) {
-        # Linux 单文件：本机调试只需要一个能跑的二进制，不起 mygo 那套 .desktop / 图标 / 包装。
+        # Linux 本机构建：mygo 出 App（可执行文件 + .desktop + 图标 + .mygo-files），
+        # 包装（deb / rpm / PKGBUILD / install.sh / tar.gz、多尺寸图标）只有发版才要，当场删掉。
+        & go tool mygo build -platform "linux/$arch" -skip-dmg -o $bin
+        if ($LASTEXITCODE -ne 0) { throw 'GUI 构建失败' }
         $dir = Join-Path $bin "linux-$arch"
-        New-Item -ItemType Directory -Force $dir | Out-Null
-        $prevGoos, $prevGoarch = $env:GOOS, $env:GOARCH
-        try {
-            $env:GOOS = 'linux'
-            $env:GOARCH = $arch
-            & go build -trimpath -o (Join-Path $dir 'pxeserver') .
-            if ($LASTEXITCODE -ne 0) { throw '构建失败' }
-        } finally {
-            $env:GOOS, $env:GOARCH = $prevGoos, $prevGoarch
+        if (-not (Test-Path (Join-Path $dir 'pxeserver'))) { throw "构建产物缺失：$dir/pxeserver" }
+        Remove-Item (Join-Path $dir '*.deb'), (Join-Path $dir '*.rpm'), (Join-Path $dir '*.tar.gz'),
+            (Join-Path $dir '*.install'), (Join-Path $dir 'PKGBUILD'), (Join-Path $dir 'install.sh') `
+            -Force -ErrorAction SilentlyContinue
+        Get-ChildItem $dir -Filter '*-*x*.png' -File -ErrorAction SilentlyContinue | Remove-Item -Force
+        Write-Host "构建完成：$dir"
+        Get-ChildItem $dir -File | Where-Object Name -ne '.mygo-files' | ForEach-Object {
+            Write-Host ('  {0,-44} {1,8:N0} KB' -f $_.Name, ($_.Length / 1KB))
         }
-        Write-Host "构建完成：$dir/pxeserver"
     } else {
         # Linux 发行构建：mygo 一次产出可执行文件 + .desktop + 图标 + deb / rpm / PKGBUILD / install.sh，
         # 以及用 install.sh 装到 ~/.local 的 tar.gz，全部留在 build/bin/linux-<arch>/，发版脚本直接取用。
