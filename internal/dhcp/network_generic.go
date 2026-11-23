@@ -1,5 +1,8 @@
 //go:build !linux
 
+// 非 Linux 平台的网络实现：绑定、收发都用 net 包的默认行为，不需要 Linux 那套
+// IP_PKTINFO 核对入口网卡（见 network_linux.go）。文件名不带 _windows 后缀是因为
+// 这里没有 Windows 专有代码，只是把 Linux 排除在外（与其它平台共用同一份实现）。
 package dhcp
 
 import (
