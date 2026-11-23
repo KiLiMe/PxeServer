@@ -2,8 +2,13 @@
 [CmdletBinding()]
 param(
     [switch]$Test,
+    # 发行构建：Linux 才加上 .desktop / 图标 / deb / rpm / PKGBUILD / tar.gz（与 build.sh -p 等价）。
+    # 默认只编译能直接跑的东西：Windows 出 PxeServer.exe（mygo 写图标与版本资源，本来就是一个文件），
+    # Linux 出 build/bin/linux-<arch>/pxeserver。Windows 没有包，-Package 对它无效。
+    [switch]$Package,
     [string]$Version,
-    # 目标平台：windows 出单文件 PxeServer.exe；linux 出 App、.deb、.rpm、PKGBUILD 与 install.sh 打包的 tar.gz。
+    # 目标平台：windows 出单文件 PxeServer.exe；linux 默认出单文件 pxeserver，加 -Package 才出 App、
+    # .deb、.rpm、PKGBUILD 与 install.sh 打包的 tar.gz。
     [ValidateSet('windows', 'linux')][string]$Target = 'windows',
     # 目标架构：默认跟随当前 go env GOARCH（Windows 上仍是 amd64）。
     [string]$Arch
@@ -33,6 +38,11 @@ try {
     $bin = [IO.Path]::GetFullPath((Join-Path $root 'build/bin'))
     New-Item -ItemType Directory -Force $bin | Out-Null
     $arch = if ($Arch) { $Arch } else { (& go env GOARCH).Trim() }
+    # 版本号只写进发行物（exe 的资源、deb/rpm 的文件名与 metadata）：Linux 单文件构建用不上它。
+    if ($Version -and $Target -eq 'linux' -and -not $Package) {
+        Write-Host "提示：-Version 只用于 -Package（发行包），本次构建忽略版本号 $Version"
+        $Version = $null
+    }
     if ($Target -eq 'windows') {
         $output = Join-Path $bin 'PxeServer.exe'
         # 正在跑的界面占着输出文件，Windows 会拒绝覆盖（或被截成半截）：先说清楚是哪个 PID。
@@ -66,8 +76,22 @@ try {
         $fileVersion = (Get-Item $output).VersionInfo.FileVersion
         $suffix = if ($fileVersion) { "（exe 版本 $fileVersion）" } else { '' }
         Write-Host "构建完成：$output$suffix"
+    } elseif (-not $Package) {
+        # Linux 单文件：本机调试只需要一个能跑的二进制，不起 mygo 那套 .desktop / 图标 / 包装。
+        $dir = Join-Path $bin "linux-$arch"
+        New-Item -ItemType Directory -Force $dir | Out-Null
+        $prevGoos, $prevGoarch = $env:GOOS, $env:GOARCH
+        try {
+            $env:GOOS = 'linux'
+            $env:GOARCH = $arch
+            & go build -trimpath -o (Join-Path $dir 'pxeserver') .
+            if ($LASTEXITCODE -ne 0) { throw '构建失败' }
+        } finally {
+            $env:GOOS, $env:GOARCH = $prevGoos, $prevGoarch
+        }
+        Write-Host "构建完成：$dir/pxeserver"
     } else {
-        # Linux：mygo 一次产出可执行文件 + .desktop + 图标 + deb / rpm / PKGBUILD / install.sh，
+        # Linux 发行构建：mygo 一次产出可执行文件 + .desktop + 图标 + deb / rpm / PKGBUILD / install.sh，
         # 以及用 install.sh 装到 ~/.local 的 tar.gz，全部留在 build/bin/linux-<arch>/，发版脚本直接取用。
         & go tool mygo build -platform "linux/$arch" -skip-dmg -o $bin
         if ($LASTEXITCODE -ne 0) { throw 'GUI 构建失败' }

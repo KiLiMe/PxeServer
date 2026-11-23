@@ -29,7 +29,7 @@
 | `internal/isorom/iso.go` | ISO9660 只读视图（ISO 直连已剥离，仅余后端；见 `docs/scope.md`） |
 | `boot/menu.ipxe` | 示例 iPXE 菜单（**唯一入库**的 boot 文件） |
 | `Scripts/patch-packages.sh` | 打包期授权：给 PKGBUILD 追加 `install=pxeserver.install` 与 `post_install`，有工具时再给 deb 注入 `postinst`、给 rpm 重建 `%post`（缺 `dpkg-deb` / `rpmbuild` 就跳过）；由 `build.sh` / `build.ps1` 在出包后调用 |
-| `Scripts/build.ps1` / `Scripts/build.sh` / `Scripts/release.ps1` | 本地构建：`build.ps1` 管 Windows 与交叉（`-Test`、`-Version X.Y.Z`、`-Target windows|linux`、`-Arch`），`build.sh` 是不需要 PowerShell 的 Linux 等价物（`-t`、`-v`、`-a`）；两者产物约定一致，都落在 `build/bin/`。`release.ps1` 打标签发版（`Scripts/release.ps1 X.Y.Z [-Push]`）；脚本一律放 `Scripts/` |
+| `Scripts/build.ps1` / `Scripts/build.sh` / `Scripts/release.ps1` | 本地构建：默认只 `go build` 出本机可执行文件（`-p` / `-Package` 才出 .desktop、图标与 deb / rpm / PKGBUILD / tar.gz，发版与 CI 必须带）。`build.ps1` 管 Windows 与交叉（`-Test`、`-Package`、`-Version X.Y.Z`、`-Target windows|linux`、`-Arch`），`build.sh` 是不需要 PowerShell 的 Linux 等价物（`-p`、`-t`、`-v`、`-a`）；两者产物约定一致，都落在 `build/bin/`。`release.ps1` 打标签发版（`Scripts/release.ps1 X.Y.Z [-Push]`）；脚本一律放 `Scripts/` |
 | `mygo.json` | 打包配置：名称 / 标识 / 版本占位（`0.0.0-dev`，`-Version` 构建时临时改写再还原，deb/rpm 文件名也按它生成）/ 图标 / 产物目录 |
 | `.github/workflows/ci.yml` / `release.yml` | `ci.yml` 跑分支 / PR 的格式与测试；`release.yml` 仅语义化版本标签（`vX.Y.Z`，可带 `-alpha/-beta/-rc`）触发，Windows + Linux 双平台矩阵构建后统一发布 |
 | `config.json` | 本地运行态，已 gitignore，不入库 |

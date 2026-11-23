@@ -4,27 +4,32 @@
 
 Windows（或任意平台交叉构建，需要 PowerShell 7）：
 
+默认只编译能直接跑的那一个文件；要发版产物（.desktop、图标、deb / rpm / PKGBUILD、tar.gz）才加 `-Package` / `-p`。
+
 ```pwsh
-pwsh ./Scripts/build.ps1 -Test        # go vet + go test，再 go tool mygo build → build/bin/PxeServer.exe
-pwsh ./Scripts/build.ps1              # 同上，不跑测试
-pwsh ./Scripts/build.ps1 -Target linux   # 交叉出 Linux 产物（build/bin/linux-<arch>/）
+pwsh ./Scripts/build.ps1 -Test                          # go vet + go test，再出 build/bin/PxeServer.exe
+pwsh ./Scripts/build.ps1                                # 同上，不跑测试
+pwsh ./Scripts/build.ps1 -Target linux                   # 交叉出 Linux 单文件 build/bin/linux-<arch>/pxeserver
+pwsh ./Scripts/build.ps1 -Target linux -Package -Version 0.2.0   # 发行物：App + deb / rpm / PKGBUILD + tar.gz
 ```
 
-Linux（**不需要 PowerShell**，`Scripts/build.sh` 是 `build.ps1 -Target linux` 的等价物）：
+Linux（**不需要 PowerShell**，`Scripts/build.sh` 是 `build.ps1 -Target linux` 的等价物，`-p` 对应 `-Package`）：
 
 ```bash
-./Scripts/build.sh -t                 # go vet + go test，再出 App / deb / rpm / PKGBUILD / tar.gz
+./Scripts/build.sh -t                 # go vet + go test，再 go build 出 build/bin/linux-<arch>/pxeserver
 ./Scripts/build.sh                    # 同上，不跑测试
-./Scripts/build.sh -v 0.2.0-rc.1      # 临时改 mygo.json 版本号，包名与 metadata 跟着变，构建后还原
-./Scripts/build.sh -a arm64           # 换目标架构（默认 go env GOARCH）
+./Scripts/build.sh -p                 # 发行物：App / .desktop / 图标 / deb / rpm / PKGBUILD / tar.gz
+./Scripts/build.sh -p -v 0.2.0-rc.1   # 临时改 mygo.json 版本号，包名与 metadata 跟着变，构建后还原
+./Scripts/build.sh -p -a arm64        # 换目标架构（默认 go env GOARCH）
 ```
 
 命令行版：`go build -o build/bin/pxed ./cmd/pxed`（Windows 加 `.exe`）。
 
-- `build.ps1` 的 `-Target windows|linux`（默认 `windows`）与 `-Arch`（默认跟随 `go env GOARCH`）选择产物，两个平台都能从任意平台交叉构建。`build.sh` 只管 Linux：参数写错、版本号不是 `X.Y.Z` 开头都在干活前就报错退出，版本号改写由 `trap` 在退出时还原，构建失败也不留脏改动。
+- 默认（不带 `-p` / `-Package`）是开发构建：只 `go build` 出本机可执行文件，不生成 `.desktop`、图标和任何包——本机调试只需要一个能跑的二进制。`-v` / `-Version` 只在发行构建里生效，单独给会被忽略并提示。发版与 CI 必须带 `-p`（`build.ps1` 是 `-Package`）。
+- `build.ps1` 的 `-Target windows|linux`（默认 `windows`）与 `-Arch`（默认跟随 `go env GOARCH`）选择产物，两个平台都能从任意平台交叉构建；Windows 目标本来就只有 exe 一个文件，`-Package` 对它无影响。`build.sh` 只管 Linux：参数写错、版本号不是 `X.Y.Z` 开头都在干活前就报错退出，版本号改写由 `trap` 在退出时还原，构建失败也不留脏改动。
 - 两个脚本的产物约定一致：全部落在 `build/bin/`，Linux 在 `build/bin/linux-<arch>/`，`release.yml` 直接取用。改一边的行为要同步另一边。
-- Linux 一次产出：可执行文件 `pxeserver`、`pxeserver.desktop`、图标、`pxeserver_<版本>_amd64.deb`、`pxeserver-<版本>-1.x86_64.rpm`、`pxeserver-<版本>-linux-amd64.tar.gz`（内含 `install.sh`，解压后装到 `~/.local`）与 `PKGBUILD`。版本号里的 `-rc.1` 在 deb / rpm 里写成 `~rc.1`（包管理器认的排序写法），tar.gz 保持原样。
-- **打包期授权**：两个脚本在 mygo 出包之后调 `Scripts/patch-packages.sh <产物目录>`，把「装完就 `setcap cap_net_bind_service=+ep /opt/pxeserver/pxeserver`」写进包：PKGBUILD 追加\`install=pxeserver.install`（`makepkg` 只认这个入口才会把脚本随包带上）与 `post_install`/`post_upgrade`，deb 注入 `DEBIAN/postinst`，rpm 按原包元数据重建 spec 后追加 `%post`。工具缺失（无 `dpkg-deb` / `rpmbuild`）就跳过并提示，注入失败会还原原包而不是让发布卡住；`release.yml` 的 Linux job 装 `rpm` 后全量注入，所以 `PKGBUILD` 之外那两种在 CI 完成。脚本里的 `|| true` 是有意的：文件系统不支持 xattr 时不能让安装失败，界面「一键授权」还能兜底。
+- Linux 发行构建（`-p`）一次产出：可执行文件 `pxeserver`、`pxeserver.desktop`、图标、`pxeserver_<版本>_amd64.deb`、`pxeserver-<版本>-1.x86_64.rpm`、`pxeserver-<版本>-linux-amd64.tar.gz`（内含 `install.sh`，解压后装到 `~/.local`）与 `PKGBUILD`。版本号里的 `-rc.1` 在 deb / rpm 里写成 `~rc.1`（包管理器认的排序写法），tar.gz 保持原样。
+- **打包期授权**：两个脚本在 mygo 出包之后调 `Scripts/patch-packages.sh <产物目录>`，把「装完就 `setcap cap_net_bind_service=+ep /opt/pxeserver/pxeserver`」写进包：PKGBUILD 追加 `install=pxeserver.install`（`makepkg` 只认这个入口才会把脚本随包带上）与 `post_install`/`post_upgrade`，deb 注入 `DEBIAN/postinst`，rpm 按原包元数据重建 spec 后追加 `%post`。工具缺失（无 `dpkg-deb` / `rpmbuild`）就跳过并提示，注入失败会还原原包而不是让发布卡住；`release.yml` 的 Linux job 装 `rpm` 后全量注入，所以 `PKGBUILD` 之外那两种在 CI 完成。脚本里的 `|| true` 是有意的：文件系统不支持 xattr 时不能让安装失败，界面「一键授权」还能兜底。
 - 图标（`build/appicon.png`）、exe 版本资源、PerMonitorV2 manifest 均由 `go tool mygo build` 写入；两个脚本都会先清理残留的 `rsrc_windows_*.syso`（Windows 传 `-skip-installer -skip-dmg`，Linux 传 `-skip-dmg`）。
 - 升级 `mygo` 时需同步升级工具链依赖：`go get github.com/egoist/mygo@vX.Y.Z github.com/egoist/mygo/cmd/mygo@vX.Y.Z && go mod tidy`。
 - 界面调试截图：`PxeServer.exe -capture screenshot.png`（启动约 2 秒后保存原生窗口并退出）。
@@ -86,7 +91,7 @@ pwsh ./Scripts/release.ps1 0.5.0 -Push  # 推送标签触发 GitHub Actions 发�
 | --- | --- | --- |
 | `ci.yml` (`check`) | push `main`/`master`、PR | `gofmt -l`、`go vet ./internal/...`、`mygo generate` 一致性校验、`go test -race ./internal/...`（Linux） |
 | `release.yml` (`meta`) | 仅 `v*` 标签 | 校验语义化版本标签，解出版本号与是否预发布 |
-| `release.yml` (`build`) | 同上，`windows-latest` + `ubuntu-latest` 矩阵 | `build.ps1 -Target <平台> -Version …` + 构建 `pxed` + `-selftest` 冒烟 + 打包为 artifact（Linux 那次额外跑 `gofmt`/`vet`/`test`） |
+| `release.yml` (`build`) | 同上，`windows-latest` + `ubuntu-latest` 矩阵 | `build.ps1 -Target <平台> -Package -Version …` + 构建 `pxed` + `-selftest` 冒烟 + 打包为 artifact（Linux 那次额外跑 `gofmt`/`vet`/`test`） |
 | `release.yml` (`publish`) | 同上 | 汇总两平台资产、生成 `SHA256SUMS.txt`、创建 Release（含 `-` 自动标 Pre-release；重跑时覆盖资产） |
 
 发布资产：
@@ -103,6 +108,6 @@ pwsh ./Scripts/release.ps1 0.5.0 -Push  # 推送标签触发 GitHub Actions 发�
 
 ### 版本号注入
 
-- **GUI (`PxeServer`)**：`Scripts/build.ps1 -Version X.Y.Z`（Linux 用 `Scripts/build.sh -v X.Y.Z`）构建前临时改写 `mygo.json` 的 `version`（已自动剔除 `+` 构建信息），构建后还原；`mygo.App.Version()` 读回展示。开发构建为 `0.0.0-dev`。
-- **Linux 包**：deb / rpm 的 metadata 与产物文件名同样按 `mygo.json` 的 `version` 生成，所以发版必须先过 `build.ps1 -Version` / `build.sh -v`，不要直接 `go tool mygo build`。
+- **GUI (`PxeServer`)**：`Scripts/build.ps1 -Package -Version X.Y.Z`（Linux 用 `Scripts/build.sh -p -v X.Y.Z`）构建前临时改写 `mygo.json` 的 `version`（已自动剔除 `+` 构建信息），构建后还原；`mygo.App.Version()` 读回展示。开发构建为 `0.0.0-dev`。
+- **Linux 包**：deb / rpm 的 metadata 与产物文件名同样按 `mygo.json` 的 `version` 生成，所以发版必须先过 `build.ps1 -Package -Version` / `build.sh -p -v`，不要直接 `go tool mygo build`。
 - **CLI (`pxed`)**：通过 `-ldflags "-X main.Version=..."` 注入。
