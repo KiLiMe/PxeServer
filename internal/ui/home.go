@@ -13,6 +13,11 @@ import (
 
 // home 是「主页」：服务、网络与启动参数，日常调参都在这一页。
 func (u *UI) home(c *ui.Context) {
+	// 特权端口那条要放在最上面：普通用户在 Linux 上必然绑不上 67/69，
+	// 与其让用户点完「启动」去日志里找 bind: permission denied，不如开机就说清楚。
+	if !u.privilegedOK && !u.status.Running {
+		hintBox(c, locales.PrivilegedPortHint(u.setcapHint()), msgWarn)
+	}
 	section(c, locales.SectionServices(), func() {
 		ui.Checkbox(c, &u.cfg.ProxyDHCP, locales.ProxyDHCP())
 		ui.Checkbox(c, &u.cfg.HTTPEnable, locales.EnableHTTP())
@@ -192,4 +197,14 @@ func ipAdd(ip net.IP, n int) net.IP {
 	out := make(net.IP, net.IPv4len)
 	binary.BigEndian.PutUint32(out, binary.BigEndian.Uint32(ip.To4())+uint32(n))
 	return out
+}
+
+// setcapHint 返回给用户直接抄的一条命令：路径取当前可执行文件，
+// 取不到时写成占位，用户至少知道该填什么。
+func (u *UI) setcapHint() string {
+	exe := u.app.ExecutablePath()
+	if exe == "" {
+		exe = "<pxeserver 的路径>"
+	}
+	return "sudo setcap 'cap_net_bind_service=+ep' " + exe
 }

@@ -398,3 +398,15 @@ func TestIPAdd(t *testing.T) {
 		})
 	}
 }
+
+func TestNativeSetcapHint(t *testing.T) {
+	u := New(app.NewInMemory(config.Default()))
+	u.Load()
+	hint := u.setcapHint()
+	if !strings.Contains(hint, "sudo setcap 'cap_net_bind_service=+ep' ") {
+		t.Fatalf("setcap 命令不完整：%q", hint)
+	}
+	if strings.HasSuffix(hint, " ") {
+		t.Fatalf("setcap 命令缺少可执行文件路径：%q", hint)
+	}
+}

@@ -8,7 +8,7 @@ Windows 与 Linux 共用同一套 `internal/` 内核，行为一致（同一 DHC
 | --- | --- | --- |
 | 桌面界面 | `PxeServer.exe`（mygo） | `pxeserver`（同一份 mygo 代码，系统 GTK3 + WebKitGTK） |
 | 命令行 | `pxed.exe` | `pxed` |
-| 67/69/80 特权端口 | 无需管理员 | 需 `setcap` / `sudo` / systemd `AmbientCapabilities` |
+| 67/69/80 特权端口 | 无需管理员 | 需 `setcap` / `sudo` / systemd `AmbientCapabilities`；界面会提前检测并拦住「启动」 |
 | 防火墙 | 界面一键「放行程序」（按程序路径） | 不提供（块级隐藏）；自己开 `dhcp` 服务与 `69/udp` |
 | 单实例 | 命名互斥体 + 把窗口拉到前台 | `flock` 锁文件 + 一句话提示退出 |
 | 发行方式 | 单文件 exe / zip | `.deb`、`.rpm`、`PKGBUILD`、`install.sh` tar.gz |

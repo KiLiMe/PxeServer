@@ -22,6 +22,7 @@
 | `internal/firewall/firewall_other.go` | 非 Windows 的占位实现（`Supported()` 恒为假，界面因此隐藏防火墙那一段） |
 | `internal/single/single_{windows,linux,other}.go` | 单实例保护：Windows 命名互斥体 `Local\PXE Server` + 拉前台；Linux `flock` 锁文件 `runtime_dir/pxe-server.lock`，只提示不激活窗口 |
 | `internal/netif/netif.go` | 网卡枚举（界面「网卡」下拉数据源） |
+| `internal/priv/priv_{linux,other}.go` | 特权端口检测：Linux 读 `/proc/self/status` 的 `CapEff` 判 `CAP_NET_BIND_SERVICE`，其余平台恒真；界面据此提前提示并拦住「启动」 |
 | `internal/shell/shell_{windows,other}.go` | 用系统默认程序打开文件 |
 | `internal/tftp/server.go` | 只读 TFTP，blksize 1468 + tsize |
 | `internal/httpd/server.go` | HTTP 静态服务（wimboot / iPXE kernel / `/iso/`） |

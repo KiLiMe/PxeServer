@@ -11,6 +11,7 @@ import (
 
 	"pxeserv/internal/config"
 	"pxeserv/internal/logbook"
+	"pxeserv/internal/priv"
 	"pxeserv/internal/pxe"
 )
 
@@ -54,6 +55,15 @@ func main() {
 		cfg.HTTPEnable = false
 	}
 	logf(logbook.Info, "配置：%s（ProxyDHCP=%v HTTP=%v 根目录=%s）", *cfgPath, cfg.ProxyDHCP, cfg.HTTPEnable, cfg.TFTPRoot)
+
+	// 普通用户在 Linux 上绑不了 67/69：提前说清楚，别让下面的 bind 报错自己解释。
+	if !priv.CanBindPrivilegedPorts() {
+		exe, err := os.Executable()
+		if err != nil || exe == "" {
+			exe = "<pxed 的路径>"
+		}
+		fmt.Fprintf(os.Stderr, "提示：当前进程不能绑定特权端口（67/69），服务多半起不来。可执行 sudo setcap 'cap_net_bind_service=+ep' %s，或用 sudo 运行；详见 docs/troubleshooting.md 第 6 节。\n", exe)
+	}
 
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt, syscall.SIGTERM)

@@ -1392,11 +1392,11 @@ func (msgs Messages) BootRootDialogTitle() string {
 	return Catalog.Format(msgs.locale, "bootRootDialogTitle", nil)
 }
 
-// DhcpStartFailed says "DHCP 服务启动失败：\n\n{err}\n\nudp:67 可能已被其他 DHCP 服务占用。\n请勾选 ProxyDHCP 只应答 PXE …"
+// DhcpStartFailed says "DHCP 服务启动失败：\n\n{err}\n\nudp:67 可能已被其他 DHCP 服务占用，或「服务器 IP…"
 // in the language the app shows.
 func DhcpStartFailed(err string) string { return In(i18n.Locale()).DhcpStartFailed(err) }
 
-// DhcpStartFailed says "DHCP 服务启动失败：\n\n{err}\n\nudp:67 可能已被其他 DHCP 服务占用。\n请勾选 ProxyDHCP 只应答 PXE …"
+// DhcpStartFailed says "DHCP 服务启动失败：\n\n{err}\n\nudp:67 可能已被其他 DHCP 服务占用，或「服务器 IP…"
 // in the language of msgs.
 func (msgs Messages) DhcpStartFailed(err string) string {
 	return Catalog.Format(msgs.locale, "dhcpStartFailed", map[string]any{"err": err})
@@ -1704,6 +1704,26 @@ func ProxyPoolHint() string { return In(i18n.Locale()).ProxyPoolHint() }
 // in the language of msgs.
 func (msgs Messages) ProxyPoolHint() string {
 	return Catalog.Format(msgs.locale, "proxyPoolHint", nil)
+}
+
+// PrivilegedPortHint says "当前进程没有绑定特权端口的权限：Linux 上 67/69（以及 HTTP 默认的 80）都在 1024 …"
+// in the language the app shows.
+func PrivilegedPortHint(cmd string) string { return In(i18n.Locale()).PrivilegedPortHint(cmd) }
+
+// PrivilegedPortHint says "当前进程没有绑定特权端口的权限：Linux 上 67/69（以及 HTTP 默认的 80）都在 1024 …"
+// in the language of msgs.
+func (msgs Messages) PrivilegedPortHint(cmd string) string {
+	return Catalog.Format(msgs.locale, "privilegedPortHint", map[string]any{"cmd": cmd})
+}
+
+// PrivilegedPortBlocked says "未启动：当前进程不能绑定 67/69 这类特权端口。请先执行 {cmd}（或 sudo 运行、或用 systemd…"
+// in the language the app shows.
+func PrivilegedPortBlocked(cmd string) string { return In(i18n.Locale()).PrivilegedPortBlocked(cmd) }
+
+// PrivilegedPortBlocked says "未启动：当前进程不能绑定 67/69 这类特权端口。请先执行 {cmd}（或 sudo 运行、或用 systemd…"
+// in the language of msgs.
+func (msgs Messages) PrivilegedPortBlocked(cmd string) string {
+	return Catalog.Format(msgs.locale, "privilegedPortBlocked", map[string]any{"cmd": cmd})
 }
 
 // ArchKeyInvalid says "架构号必须为非负整数（如 7、9、10）"

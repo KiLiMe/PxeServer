@@ -35,8 +35,19 @@
 
 - **现象**：日志里 `DHCPd：` / `TFTPd：` 报绑定 `:67` / `:69` 失败，服务按钮弹回未运行；`pxed` 直接退出。
 - **原因**：低于 1024 的端口是特权端口，普通用户绑不了（Windows 没这个限制，所以界面里不会提示）。
+- **提前提示**：Linux 上程序启动时会读 `/proc/self/status` 的 `CapEff`（第 10 位 = `CAP_NET_BIND_SERVICE`），判断不了就退回按 `euid==0` 粗判（`internal/priv`）。没有该能力时：
+  - 主页顶部直接画出这条提示（含可复制的 `setcap` 命令，路径是本进程的可执行文件）；
+  - 点「启动」会被立刻拦下并弹提示，不会真去绑端口，配置仍照常保存；
+  - `pxed` 在 `pxe.Start` 之前就往 stderr 打一行同样的提示（仍继续启动，后续错误处理不变）。
+  - `setcap` 对已在运行的进程不生效，改完必须重启程序；`CapEff` 显示的是 effective 位，systemd 用 `AmbientCapabilities` 才能让这一位保留下来。
 - **解法**：任选一种——
   - `sudo setcap 'cap_net_bind_service=+ep' /usr/bin/pxeserver`（或你解压/编译出来的路径），之后普通用户可直接运行；用 `.deb` / `.rpm` 装的升级后要重设。
   - `sudo ./pxeserver` / `sudo ./pxed`（注意 `config.json` 与 `PXE-server.log` 会落在当前目录，且归 root 所有）。
   - 用 systemd 服务并加 `AmbientCapabilities=CAP_NET_BIND_SERVICE`。
 - **附带**：Linux 的防火墙按端口而不是按程序，界面不提供「放行程序」；开着 firewalld 的发行版（Fedora / RHEL / openSUSE）要自己开：`sudo firewall-cmd --add-service=dhcp --add-port=69/udp --add-port=80/tcp`（HTTP 端口按你配的改）。ufw 同理：`sudo ufw allow 67/udp` 等。
+
+## 7. 启动时报 `无法绑定 <IP>:67`（服务器 IP 不是本机网卡地址）
+
+- **现象**：Windows 上点「启动」后弹「DHCP 服务启动失败」，正文含 `无法绑定 192.168.5.1:67（请确认「服务器 IP」是本机某块网卡上的地址）：listen udp4 … bind: …`。
+- **原因**：`config.json` 里的 `server_ip` 已不属于本机任何一块网卡——网卡 IP 被路由器重分、网卡被禁用/拔出、配置文件从别的机器拷来，或手工改过。服务端**不会**退回监听 `0.0.0.0:67`：那样虽然能绑上，但应答里的 Option 54 / Option 66 仍是这个地址，客户端会一直卡在 `Configuring`，比直接报错更难查。
+- **解法**：回主页在「网卡」下拉里重新选择本机网卡（会同步 `server_ip` 与广播地址），保存后重启服务；或直接编辑 `config.json` 的 `server_ip`。

@@ -48,6 +48,7 @@ type UI struct {
 	firewallMoved             string // 程序移动前的旧路径；空串表示没移动过
 	firewallQueried           bool
 	firewallSupported         bool // 当前平台有没有「按程序放行」这件事（只有 Windows 有）
+	privilegedOK              bool // 当前进程能不能绑定特权端口（只有 Linux 会为假）
 	port, poolSize, leaseTime string
 	menu, archKey, archValue  string
 	pending                   []ui.Toast
@@ -122,6 +123,7 @@ func (u *UI) Load() {
 	u.syncIface()
 	u.firewall = locales.FirewallPending()
 	u.firewallSupported = u.app.FirewallSupported()
+	u.privilegedOK = u.app.CanBindPrivilegedPorts()
 	u.lang = langLabel(u.cfg.Language)
 	u.savedKey = u.draftKey()
 	u.loaded = true
@@ -257,6 +259,7 @@ func (u *UI) saveAndStart(start bool) {
 	}
 	u.cfg.LeaseTime = uint32(lease)
 	draft := u.cfg.Clone()
+	privilegedOK, setcap := u.privilegedOK, u.setcapHint()
 	u.async(func() result {
 		if saveMsg := u.app.SaveConfig(*draft); saveMsg != "" {
 			return failed(saveMsg)
@@ -275,6 +278,12 @@ func (u *UI) saveAndStart(start bool) {
 		}
 		if !start {
 			return ok(locales.ConfigSavedApplied(), apply)
+		}
+		if !privilegedOK {
+			// 配置已经存下来了，但服务一定会因为绑不上 67/69 而失败；
+			// 这里直接拦下并给出可复制的 setcap 命令，比让用户看日志里的 bind 失败强。
+			u.app.Warnf("服务未启动：当前进程没有绑定特权端口的权限（setcap / sudo / AmbientCapabilities）")
+			return result{kind: msgError, text: locales.PrivilegedPortBlocked(setcap), apply: apply}
 		}
 		if startMsg := u.app.StartServices(); startMsg != "" {
 			return result{kind: msgError, text: locales.SavedNotStarted(startMsg), apply: apply}
