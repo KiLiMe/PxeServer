@@ -73,6 +73,15 @@ try {
         if ($LASTEXITCODE -ne 0) { throw 'GUI 构建失败' }
         $dir = Join-Path $bin "linux-$arch"
         if (-not (Test-Path (Join-Path $dir 'pxeserver'))) { throw "构建产物缺失：$dir/pxeserver" }
+        # 打包期授权：给 PKGBUILD 追加 post_install，有 dpkg-deb / rpmbuild 时顺带注入 deb 的
+        # postinst 与 rpm 的 %post；缺工具时脚本自己跳过，不算失败。
+        $bash = Get-Command bash -ErrorAction SilentlyContinue
+        if ($bash) {
+            & $bash.Source (Join-Path $PSScriptRoot 'patch-packages.sh') $dir
+            if ($LASTEXITCODE -ne 0) { throw '打包期授权注入失败' }
+        } else {
+            Write-Host '跳过打包期授权注入：没找到 bash（PKGBUILD 的 post_install 因此不会加上）'
+        }
         Write-Host "构建完成：$dir"
         Get-ChildItem $dir -File | Where-Object Name -ne '.mygo-files' | ForEach-Object {
             Write-Host ('  {0,-44} {1,8:N0} KB' -f $_.Name, ($_.Length / 1KB))

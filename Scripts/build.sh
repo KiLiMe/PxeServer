@@ -112,6 +112,10 @@ go tool mygo build -platform "linux/$arch" -skip-dmg -o "$bin"
 dir="$bin/linux-$arch"
 [[ -f $dir/pxeserver ]] || die "构建产物缺失：$dir/pxeserver"
 
+# 打包期授权：给 PKGBUILD 追加 post_install，装完就带特权端口能力；
+# deb/rpm 要 dpkg-deb 与 rpmbuild，本机没有时它会自己跳过（CI 上会注入）。
+bash "$root/Scripts/patch-packages.sh" "$dir"
+
 printf '构建完成：%s\n' "$dir"
 while IFS= read -r file; do
     [[ $(basename "$file") == .mygo-files ]] && continue

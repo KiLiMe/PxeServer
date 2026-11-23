@@ -80,6 +80,12 @@ jobs:
           go test -count=1 ./...
           if ($LASTEXITCODE -ne 0) { throw 'go test 失败' }
 
+      # 打包期授权（build.ps1 会调 Scripts/patch-packages.sh）要用 dpkg-deb 与 rpm 工具：
+      # ubuntu-latest 自带 dpkg-deb，rpm 得自己装（提供 rpm / rpm2cpio / rpmbuild）。
+      - name: 安装打包工具（deb / rpm 注入）
+        if: matrix.platform == 'linux'
+        run: sudo apt-get update && sudo apt-get install -y rpm
+
       # build.ps1 两个平台共用：-Target linux 出可执行文件 + deb / rpm / PKGBUILD / tar.gz。
       - name: 构建 PxeServer（GUI）
         shell: pwsh
@@ -115,6 +121,8 @@ jobs:
           } else {
             $dir = "build/bin/linux-$arch"
             Copy-Item "$dir/*.deb", "$dir/*.rpm", "$dir/*-linux-$arch.tar.gz", "$dir/PKGBUILD" dist/
+            # PKGBUILD 里的 install= 引用了这个文件（post_install 的来源），必须一起发。
+            Get-ChildItem $dir -Filter '*.install' -ErrorAction SilentlyContinue | Copy-Item -Destination dist/
             $stage = "build/cli-linux-$arch"
             New-Item -ItemType Directory -Force $stage | Out-Null
             Copy-Item build/bin/pxed, README.md, LICENSE $stage
@@ -188,8 +196,10 @@ jobs:
 
           **Windows**：入站流量要在「设置 → 放行程序」里按程序路径放行。
 
-          **Linux**：67 / 69（HTTP 默认 80）是特权端口，需要管理员权限——
-          `sudo setcap 'cap_net_bind_service=+ep' /usr/bin/pxeserver`，或直接 `sudo pxeserver`。
+          **Linux**：67 / 69（HTTP 默认 80）是特权端口，需要 `cap_net_bind_service`。
+          deb / rpm / PKGBUILD 装完会自动授予这个能力，直接启动即可；免安装包则在界面点
+          黄条上的「一键授权」（pkexec，会弹系统认证框），或手工执行
+          `sudo setcap 'cap_net_bind_service=+ep' /opt/pxeserver/pxeserver`，赋权后重启程序。
           Linux 的防火墙按端口而不是按程序，界面不提供「放行程序」；
           开着 firewalld 的发行版（Fedora / RHEL / openSUSE）要自己开 `dhcp` 服务与 `69/udp`。
 

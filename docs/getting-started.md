@@ -20,7 +20,8 @@ sudo setcap 'cap_net_bind_service=+ep' ./build/bin/linux-amd64/pxeserver   # 然
 ```
 
 - 构建脚本的完整参数（`-t` 跑测试、`-v` 写版本号、`-a` 换架构）与交叉构建见 [dev-release.md](dev-release.md) 的「本地构建」。
-- 67 / 69 / 80 是特权端口：不 `setcap` 就得 `sudo` 跑，否则日志报 `bind: permission denied`，详见 [troubleshooting.md](troubleshooting.md) 第 6 节。
+- 67 / 69 / 80 是特权端口：不 `setcap` 就得 `sudo` 跑，否则日志报 `bind: permission denied`，详见 [troubleshooting.md](troubleshooting.md) 第 6 节。界面顶部那块黄条右侧有「一键授权」，点一下走 pkexec（弹系统认证框）把能力打到当前可执行文件上，重启程序即生效。
+- 用 `makepkg -si` 装的 Arch 包由 PKGBUILD 里的 `post_install` 自动授权，deb / rpm 由 `postinst` / `%post` 自动授权（注入逻辑在 `Scripts/patch-packages.sh`，构建时执行），装完直接启动即可。免安装包（`~/.local`）不能预先授权，用界面按钮或下面的 `setcap`。
 - 界面「设置」里没有防火墙那一段：Linux 防火墙按端口管理，自己开 `dhcp` 服务与 `69/udp` 即可。
 - 单实例保护照旧，只是第二次启动只提示、不把窗口拉前台。
 - KDE Plasma 下，桌面端默认通过桌面门户使用 Qt 目录选择器。Linux 需有可用的 `xdg-desktop-portal-kde`，已有的 `GTK_USE_PORTAL` 设置优先。旧版可以用 `GTK_USE_PORTAL=1 ./build/bin/linux-amd64/pxeserver` 从终端启动。
