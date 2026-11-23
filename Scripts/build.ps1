@@ -4,7 +4,7 @@ param(
     [switch]$Test,
     # 发行构建：Linux 才加上 deb / rpm / PKGBUILD / tar.gz（与 build.sh -p 等价）。
     # 默认只出能直接跑的 App 目录：Windows 是 PxeServer.exe 一个文件，Linux 是
-    # build/bin/linux-<arch>/（pxeserver + .desktop + 图标 + .mygo-files）。
+    # build/linux-<arch>/（pxeserver + .desktop + 图标 + .mygo-files）。
     # Windows 没有包，-Package 对它无效。
     [switch]$Package,
     [string]$Version,
@@ -36,8 +36,8 @@ try {
         & go test ./...
         if ($LASTEXITCODE -ne 0) { throw 'go test 失败' }
     }
-    $bin = [IO.Path]::GetFullPath((Join-Path $root 'build/bin'))
-    New-Item -ItemType Directory -Force $bin | Out-Null
+    $out = [IO.Path]::GetFullPath((Join-Path $root 'build'))
+    New-Item -ItemType Directory -Force $out | Out-Null
     $arch = if ($Arch) { $Arch } else { (& go env GOARCH).Trim() }
     # 版本号只写进发行物（exe 的资源、deb/rpm 的文件名与 metadata）：Linux 单文件构建用不上它。
     if ($Version -and $Target -eq 'linux' -and -not $Package) {
@@ -45,7 +45,7 @@ try {
         $Version = $null
     }
     if ($Target -eq 'windows') {
-        $output = Join-Path $bin 'PxeServer.exe'
+        $output = Join-Path $out 'PxeServer.exe'
         # 正在跑的界面占着输出文件，Windows 会拒绝覆盖（或被截成半截）：先说清楚是哪个 PID。
         $busy = @(Get-Process -Name 'PxeServer' -ErrorAction SilentlyContinue | Where-Object {
             try { $_.Path -eq $output } catch { $false }
@@ -66,13 +66,13 @@ try {
         Set-Content $config -Value ($original -replace '"version"\s*:\s*"[^"]*"', "`"version`": `"$version`"") -Encoding utf8NoBOM -NoNewline
     }
     if ($Target -eq 'windows') {
-        & go tool mygo build -platform "windows/$arch" -skip-installer -skip-dmg -o $bin
+        & go tool mygo build -platform "windows/$arch" -skip-installer -skip-dmg -o $out
         if ($LASTEXITCODE -ne 0) { throw 'GUI 构建失败' }
-        $built = Join-Path $bin "windows-$arch/PxeServer.exe"
+        $built = Join-Path $out "windows-$arch/PxeServer.exe"
         if (-not (Test-Path $built)) { throw "构建产物缺失：$built" }
         Move-Item $built $output -Force
         # mygo 把产物放进 <out>/<平台>/，旁边还有升级清单 .mygo-files；这里只留 exe。
-        Remove-Item (Join-Path $bin "windows-$arch") -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-Item (Join-Path $out "windows-$arch") -Recurse -Force -ErrorAction SilentlyContinue
         # exe 文件属性版本只有 Windows 读得出来；在 Linux 上交叉构建 windows/amd64 时留空。
         $fileVersion = (Get-Item $output).VersionInfo.FileVersion
         $suffix = if ($fileVersion) { "（exe 版本 $fileVersion）" } else { '' }
@@ -80,9 +80,9 @@ try {
     } elseif (-not $Package) {
         # Linux 本机构建：mygo 出 App（可执行文件 + .desktop + 图标 + .mygo-files），
         # 包装（deb / rpm / PKGBUILD / install.sh / tar.gz、多尺寸图标）只有发版才要，当场删掉。
-        & go tool mygo build -platform "linux/$arch" -skip-dmg -o $bin
+        & go tool mygo build -platform "linux/$arch" -skip-dmg -o $out
         if ($LASTEXITCODE -ne 0) { throw 'GUI 构建失败' }
-        $dir = Join-Path $bin "linux-$arch"
+        $dir = Join-Path $out "linux-$arch"
         if (-not (Test-Path (Join-Path $dir 'pxeserver'))) { throw "构建产物缺失：$dir/pxeserver" }
         Remove-Item (Join-Path $dir '*.deb'), (Join-Path $dir '*.rpm'), (Join-Path $dir '*.tar.gz'),
             (Join-Path $dir '*.install'), (Join-Path $dir 'PKGBUILD'), (Join-Path $dir 'install.sh') `
@@ -94,10 +94,10 @@ try {
         }
     } else {
         # Linux 发行构建：mygo 一次产出可执行文件 + .desktop + 图标 + deb / rpm / PKGBUILD / install.sh，
-        # 以及用 install.sh 装到 ~/.local 的 tar.gz，全部留在 build/bin/linux-<arch>/，发版脚本直接取用。
-        & go tool mygo build -platform "linux/$arch" -skip-dmg -o $bin
+        # 以及用 install.sh 装到 ~/.local 的 tar.gz，全部留在 build/linux-<arch>/，发版脚本直接取用。
+        & go tool mygo build -platform "linux/$arch" -skip-dmg -o $out
         if ($LASTEXITCODE -ne 0) { throw 'GUI 构建失败' }
-        $dir = Join-Path $bin "linux-$arch"
+        $dir = Join-Path $out "linux-$arch"
         if (-not (Test-Path (Join-Path $dir 'pxeserver'))) { throw "构建产物缺失：$dir/pxeserver" }
         # 打包期授权：给 PKGBUILD 追加 post_install，有 dpkg-deb / rpmbuild 时顺带注入 deb 的
         # postinst 与 rpm 的 %post；缺工具时脚本自己跳过，不算失败。

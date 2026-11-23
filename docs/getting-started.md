@@ -13,10 +13,10 @@ go run ./cmd/pxed             # 命令行版：立刻起服务，首次在当前
 ## 在 Linux 上运行
 
 ```bash
-./Scripts/build.sh                 # 本机构建：出 build/bin/linux-<arch>/ 的 App（pxeserver + .desktop + 图标），-p 才出 deb / rpm / PKGBUILD / tar.gz
+./Scripts/build.sh                 # 本机构建：出 build/linux-<arch>/ 的 App（pxeserver + .desktop + 图标），-p 才出 deb / rpm / PKGBUILD / tar.gz
 go run ./cmd/pxed -selftest        # 同一套自检，无需 root
 go run .                           # 桌面界面（需 GTK3 + WebKitGTK，发行版包名如 webkit2gtk-4.1）
-sudo setcap 'cap_net_bind_service=+ep' ./build/bin/linux-amd64/pxeserver   # 然后就能普通用户起服务
+sudo setcap 'cap_net_bind_service=+ep' ./build/linux-amd64/pxeserver   # 然后就能普通用户起服务
 ```
 
 - 构建脚本的完整参数（`-t` 跑测试、`-v` 写版本号、`-a` 换架构）与交叉构建见 [dev-release.md](dev-release.md) 的「本地构建」。
@@ -24,7 +24,7 @@ sudo setcap 'cap_net_bind_service=+ep' ./build/bin/linux-amd64/pxeserver   # 然
 - 用 `makepkg -si` 装的 Arch 包由 PKGBUILD 里的 `post_install` 自动授权，deb / rpm 由 `postinst` / `%post` 自动授权（注入逻辑在 `Scripts/patch-packages.sh`，构建时执行），装完直接启动即可。免安装包（`~/.local`）不能预先授权，用界面按钮或下面的 `setcap`。
 - 界面「设置」里没有防火墙那一段：Linux 防火墙按端口管理，自己开 `dhcp` 服务与 `69/udp` 即可。
 - 单实例保护照旧，只是第二次启动只提示、不把窗口拉前台。
-- KDE Plasma 下，桌面端默认通过桌面门户使用 Qt 目录选择器。Linux 需有可用的 `xdg-desktop-portal-kde`，已有的 `GTK_USE_PORTAL` 设置优先。旧版可以用 `GTK_USE_PORTAL=1 ./build/bin/linux-amd64/pxeserver` 从终端启动。
+- KDE Plasma 下，桌面端默认通过桌面门户使用 Qt 目录选择器。Linux 需有可用的 `xdg-desktop-portal-kde`，已有的 `GTK_USE_PORTAL` 设置优先。旧版可以用 `GTK_USE_PORTAL=1 ./build/linux-amd64/pxeserver` 从终端启动。
 - 启动文件可以放在已挂载的数据盘上。在主页选择目录并保存，或在桌面版 `config.json` 中把 `tftp_root` 设为绝对路径。TFTP 和 HTTP 共用该目录。命令行版也可以用 `pxed -root /mnt/data/pxe/boot` 指定。
 - `server_ip` 必须是本机用于 PXE 的网卡 IPv4。Linux 按该网卡接收 DHCP 广播并发送应答，地址尚未配置时启动会报错。
 - `pxed` 在 TFTP 或已启用的 HTTP 端口绑定失败时以非零状态退出。启用 HTTP 时，桌面端和 `pxed` 都会在启动目录生成 `httpboot.ipxe` 供 `autoexec.ipxe` 跳转到 HTTP 菜单。使用 `pxed -no-http` 时，DHCP 下发以 TFTP 为基准的菜单文件名。

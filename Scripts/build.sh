@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # Linux 构建入口（不需要 PowerShell）。默认出本机可运行的 App 目录（可执行文件 + .desktop +
 # 图标 + .mygo-files），不造 deb / rpm / PKGBUILD / tar.gz；要发行物就加 -p/--package。
-# Windows 与 CI 走 Scripts/build.ps1；两边只共用一个约定——产物都留在 build/bin/ 下。
+# Windows 与 CI 走 Scripts/build.ps1；两边只共用一个约定——产物都留在 build/ 下。
 set -euo pipefail
 
 root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-bin="$root/build/bin"
+out="$root/build"
 config="$root/mygo.json"
 backup=""
 run_tests=0
@@ -17,7 +17,7 @@ usage() {
     cat <<'EOF'
 用法：Scripts/build.sh [选项]
 
-不带 -p 时只做一件事：出本机可运行的 build/bin/linux-<arch>/（pxeserver、.desktop、图标）。
+不带 -p 时只做一件事：出本机可运行的 build/linux-<arch>/（pxeserver、.desktop、图标）。
 
   -p, --package         再加发行物：deb / rpm / PKGBUILD、带 install.sh 的 tar.gz
   -t, --test            构建前跑 go vet ./... 与 go test ./...
@@ -102,13 +102,13 @@ fi
 
 arch=${arch:-$(go env GOARCH)}
 
-dir="$bin/linux-$arch"
+dir="$out/linux-$arch"
 mkdir -p "$dir"
 
 if ((!package)); then
     # 本机开发构建：mygo 照旧出 App（可执行文件 + .desktop + 图标 + .mygo-files），
     # 但包装只有发版才用得上，当场删掉——目录里只留跑得起来的那一份。
-    go tool mygo build -platform "linux/$arch" -skip-dmg -o "$bin"
+    go tool mygo build -platform "linux/$arch" -skip-dmg -o "$out"
     [[ -f $dir/pxeserver ]] || die "构建产物缺失：$dir/pxeserver"
     rm -f "$dir"/*.deb "$dir"/*.rpm "$dir"/*.tar.gz "$dir"/*.install "$dir"/PKGBUILD "$dir"/install.sh
     # 多尺寸图标只用于包与桌面菜单，界面运行时读的是 pxeserver.png。
@@ -131,8 +131,8 @@ if [[ -n $version ]]; then
 fi
 
 # mygo 一次产出可执行文件 + .desktop + 图标 + deb / rpm / PKGBUILD / install.sh，
-# 以及用 install.sh 装到 ~/.local 的 tar.gz，全部留在 build/bin/linux-<arch>/。
-go tool mygo build -platform "linux/$arch" -skip-dmg -o "$bin"
+# 以及用 install.sh 装到 ~/.local 的 tar.gz，全部留在 build/linux-<arch>/。
+go tool mygo build -platform "linux/$arch" -skip-dmg -o "$out"
 
 [[ -f $dir/pxeserver ]] || die "构建产物缺失：$dir/pxeserver"
 

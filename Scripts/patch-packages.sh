@@ -5,14 +5,14 @@
 #   - deb：需要 dpkg-deb，给 control 加 DEBIAN/postinst；
 #   - rpm：需要 rpm2cpio + cpio + rpmbuild，按原包的元数据重建并追加 %post。
 # 缺工具就跳过并说明——界面里的「一键授权」（pkexec）仍能兜底。
-# 用法：Scripts/patch-packages.sh <产物目录>（即 build/bin/linux-<arch>）
+# 用法：Scripts/patch-packages.sh <产物目录>（即 build/linux-<arch>）
 set -euo pipefail
 
 app=pxeserver
 exe=/opt/$app/$app
 cap='cap_net_bind_service=+ep'
 
-dir=${1:-build/bin/linux-amd64}
+dir=${1:-build/linux-amd64}
 [[ -d $dir ]] || { printf '产物目录不存在：%s\n' "$dir" >&2; exit 1; }
 
 have() { command -v "$1" >/dev/null 2>&1; }
