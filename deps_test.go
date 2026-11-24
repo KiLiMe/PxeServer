@@ -143,3 +143,43 @@ func TestInternalNoPrint(t *testing.T) {
 		}
 	}
 }
+
+// layering 是分层里“谁不该看到谁”：界面只调 App 的导出方法，App 不反向依赖界面，
+// 服务编排层也看不到界面。只靠“不 import 主包”守不住这几条，所以一起机械校验。
+var layering = []struct {
+	pkg      string
+	prefixes []string
+	why      string
+}{
+	{"pxeserv/internal/ui", []string{"pxeserv/internal/dhcp", "pxeserv/internal/tftp", "pxeserv/internal/httpd", "pxeserv/internal/pxe"},
+		"界面只调 App 的导出方法，不直接碰服务内核"},
+	{"pxeserv/internal/app", []string{"pxeserv/internal/ui"}, "App 不反向依赖界面"},
+	{"pxeserv/internal/pxe", []string{"pxeserv/internal/ui", "pxeserv/internal/app"}, "服务编排层看不到界面与 App"},
+}
+
+// TestLayering 校验上面的分层约束。
+// 比的是前缀而不是全等：将来 internal/dhcp 拆出子包，也不会从规则里溜掉。
+// 只看非测试文件的 import（go list .Imports）；测试里为了造夹具而 import 内核包不受限。
+func TestLayering(t *testing.T) {
+	pkgs := internalPackages(t)
+	for _, rule := range layering {
+		var target *listed
+		for i := range pkgs {
+			if pkgs[i].path == rule.pkg {
+				target = &pkgs[i]
+				break
+			}
+		}
+		if target == nil {
+			t.Errorf("go list 没找到 %s：分层规则失效", rule.pkg)
+			continue
+		}
+		for _, imp := range target.imports {
+			for _, forbidden := range rule.prefixes {
+				if imp == forbidden || strings.HasPrefix(imp, forbidden+"/") {
+					t.Errorf("%s import 了 %s：%s", rule.pkg, imp, rule.why)
+				}
+			}
+		}
+	}
+}

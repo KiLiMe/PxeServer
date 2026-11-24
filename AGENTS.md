@@ -7,13 +7,16 @@
 | 路径 | 作用 |
 | --- | --- |
 | `main.go` | 唯一的主包文件：mygo 启动、窗口装配、提权分支（`-capture` 截图） |
-| `deps_test.go` | 依赖方向的机械校验（`go list` + 源码扫描） |
+| `deps_test.go` | 依赖方向的机械校验（`go list` + 源码扫描）：不 import 主包、不直接打印、分层不得反向 |
 | `cmd/pxed/main.go` | 无界面入口；`cmd/pxed/helpers.go` 为 `-selftest` 自检 |
 | `internal/app/app.go` | `App`：生命周期、`Status`、关于信息；同目录 `services.go` 起停服务、`config.go` 配置持久化、`menu.go` 菜单读写、`logs.go` 日志、`dialogs.go` 文件与目录选择、`picker_{linux,other}.go` 按桌面挑目录选择器（`kdialog` / `zenity`，都没有就用 mygo 的 GTK 对话框）、`firewall.go` 防火墙包装、`debugapi.go` 本地调试接口框架（仅 `-debug-port` 开启，只监听 `127.0.0.1`），端点分在 `debugapi_logs.go` / `debugapi_dhcp.go` / `debugapi_services.go` |
 | `internal/ui/` | mygo 原生界面：`ui.go` 是状态与顶层视图，`action.go` 一次操作的抽象（结果、异步、脏检查），`widget.go` 跨页面通用控件，`home.go`/`settings.go`/`menu.go`/`arch.go`/`logs.go`/`leases.go`/`about.go` 每页一个文件（主页另分 `iface.go` 网卡联动、`privilege.go` 授权交互；只调 `App` 的导出方法） |
-| `internal/config/` | `config.go` 为 `Config`（字段 = 界面控件）与默认值、`normalize.go` 校验与回落、`persist.go` 读写盘与 `runtime.*`、`net.go` 地址位运算与 IP 探测、`path.go` 为 `DefaultPath()`、`doc.go` 为文件地图 |
+| `internal/config/` | `config.go` 为 `Config`（字段 = 界面控件）与默认值、`normalize.go` 校验与回落、`persist.go` 读写盘与 `runtime.*`、`net.go` 默认路由网卡的 IP 探测、`path.go` 为 `DefaultPath()`、`doc.go` 为文件地图 |
 | `internal/config/extra.go` | 额外 DHCP 选项解析 |
+| `internal/netaddr/netaddr.go` | IPv4 位运算（`ToU32` / `FromU32` / `Add`）与区间判断 `InRange`：配置校验、地址池、界面推算共用这一份 |
+| `internal/human/human.go` | 体积格式化 `Bytes`（日志与索引页共用） |
 | `internal/logbook/logbook.go` | 日志级别（`I`/`W`/`E`）与内核包的 `Logger` 回调签名 |
+| `internal/pxe/services.go` | 服务编排：`Start` / `Stop` 与启动错误定位；`menu.go` 是 iPXE 菜单读写与 `MenuURL` |
 | `internal/locales/zh-Hans.json` / `en.json` | 界面文案（源语言 / 英文），`catalog_gen.go` 为 `go tool mygo generate` 生成物；见 `docs/dev-release.md` 的「界面文案（i18n）」 |
 | `internal/dhcp/packet.go` | 手写 BOOTP/DHCP 编解码（236 头 + cookie + TLV） |
 | `internal/dhcp/` | DHCP / ProxyDHCP：`server.go` 生命周期与读循环、`dispatch.go` 报文分发与消息语义、`reply.go` 应答构造（option 43/66/67）、`transport.go` UDP 收发、`pool.go` 地址池与租约、`log.go` 日志级别与合并、`doc.go` 为文件地图 |
@@ -49,7 +52,7 @@
 
 ### Go 代码
 - 模块名 `pxeserv`，Go 1.27.3；依赖只有 `egoist/mygo`、`kdomanski/iso9660`、`pin/tftp/v3`、`golang.org/x/sys`。**不要随意加依赖**。
-- 内核与 UI 解耦：`internal/*` 不 import 主包，也不直接打印；日志一律走 `internal/logbook.Logger` 回调。级别由写日志的一端标注：`a.Logf`（信息）、`a.Warnf`（警告，客户端侧失败、端口没绑上这类）、`a.Errorf`（本次运行真的坏了）。`deps_test.go` 机械校验“不 import 主包、不直接打印”这两条。
+- 内核与 UI 解耦：`internal/*` 不 import 主包，也不直接打印；日志一律走 `internal/logbook.Logger` 回调。级别由写日志的一端标注：`a.Logf`（信息）、`a.Warnf`（警告，客户端侧失败、端口没绑上这类）、`a.Errorf`（本次运行真的坏了）。`deps_test.go` 机械校验“不 import 主包、不直接打印”以及分层反向依赖（界面看不到服务内核、`App` 不 import 界面）。
 - 布局固定：根目录只放 `main.go`（+ `deps_test.go`）。界面代码放 `internal/ui`（只调 `App` 的导出方法，不 import 内核包）；服务编排、配置持久化、日志、菜单、选文件对话框、调试接口放 `internal/app`（按职责分文件，别堆回一个文件）；能被独立测试的纯逻辑放各自的 `internal/<名字>` 包。新功能不要往根目录加文件。
 - 平台差异按文件后缀分：`*_windows.go`、`*_linux.go`，其余平台落实在 `*_other.go`（构建约束 `!windows && !linux`），对外只暴露同一个函数名，调用处不写 `runtime.GOOS` 分支。
 - 日志前缀统一 `DHCPd：` / `TFTPd：` / `HTTPd：`（**全角冒号**），其后接句子；术语用中文（`架构`、`地址池`），MAC 保持 `MAC=`。
