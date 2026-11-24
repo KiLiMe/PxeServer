@@ -39,7 +39,7 @@ Windows 与 Linux 共用同一套 `internal/` 内核，行为一致（同一 DHC
 
 ## ISO 直连剥离现状
 
-为聚焦 WinPE/WIM 场景并减少界面/配置维护面，提交 `5ffa9d9` 剥离了 `internal/bootmenu`、ISO 挂载配置与 UI/CLI 入口；目前仅保留 `internal/isorom/iso.go` 与 `internal/httpd/server.go` 的 `/iso/` 路由（因无调用 `httpd.SetISOs`，`/iso/*` 恒返回 404）。如需还原，直接检出 `5ffa9d9^` 相关文件即可。
+为聚焦 WinPE/WIM 场景并减少界面/配置维护面，提交 `5ffa9d9` 剥离了 `internal/bootmenu`、ISO 挂载配置与 UI/CLI 入口；目前仅保留 `internal/isorom/iso.go` 与 `internal/httpd/iso.go` 的 `/iso/` 路由（因无调用 `httpd.SetISOs`，`/iso/*` 恒返回 404）。如需还原，直接检出 `5ffa9d9^` 相关文件即可。
 
 ## 明确不做的三项
 

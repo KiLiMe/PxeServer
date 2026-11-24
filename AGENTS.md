@@ -9,14 +9,14 @@
 | `main.go` | 唯一的主包文件：mygo 启动、窗口装配、提权分支（`-capture` 截图） |
 | `deps_test.go` | 依赖方向的机械校验（`go list` + 源码扫描） |
 | `cmd/pxed/main.go` | 无界面入口；`cmd/pxed/helpers.go` 为 `-selftest` 自检 |
-| `internal/app/app.go` | `App`：生命周期、`Status`、关于信息；同目录 `services.go` 起停服务、`config.go` 配置持久化、`menu.go` 菜单读写、`logs.go` 日志、`dialogs.go` 文件与目录选择、`picker_{linux,other}.go` 按桌面挑目录选择器（`kdialog` / `zenity`，都没有就用 mygo 的 GTK 对话框）、`firewall.go` 防火墙包装、`debugapi.go` 本地调试接口（仅 `-debug-port` 开启，只监听 `127.0.0.1`） |
-| `internal/ui/` | mygo 原生界面：`ui.go` 是状态、调度与通用控件，`home.go`/`settings.go`/`menu.go`/`arch.go`/`logs.go`/`leases.go`/`about.go` 每页一个文件（只调 `App` 的导出方法） |
-| `internal/config/config.go` | `Config`（字段 = 界面控件）、IP 探测；`path.go` 为 `DefaultPath()` |
+| `internal/app/app.go` | `App`：生命周期、`Status`、关于信息；同目录 `services.go` 起停服务、`config.go` 配置持久化、`menu.go` 菜单读写、`logs.go` 日志、`dialogs.go` 文件与目录选择、`picker_{linux,other}.go` 按桌面挑目录选择器（`kdialog` / `zenity`，都没有就用 mygo 的 GTK 对话框）、`firewall.go` 防火墙包装、`debugapi.go` 本地调试接口框架（仅 `-debug-port` 开启，只监听 `127.0.0.1`），端点分在 `debugapi_logs.go` / `debugapi_dhcp.go` / `debugapi_services.go` |
+| `internal/ui/` | mygo 原生界面：`ui.go` 是状态与顶层视图，`action.go` 一次操作的抽象（结果、异步、脏检查），`widget.go` 跨页面通用控件，`home.go`/`settings.go`/`menu.go`/`arch.go`/`logs.go`/`leases.go`/`about.go` 每页一个文件（主页另分 `iface.go` 网卡联动、`privilege.go` 授权交互；只调 `App` 的导出方法） |
+| `internal/config/` | `config.go` 为 `Config`（字段 = 界面控件）与默认值、`normalize.go` 校验与回落、`persist.go` 读写盘与 `runtime.*`、`net.go` 地址位运算与 IP 探测、`path.go` 为 `DefaultPath()`、`doc.go` 为文件地图 |
 | `internal/config/extra.go` | 额外 DHCP 选项解析 |
 | `internal/logbook/logbook.go` | 日志级别（`I`/`W`/`E`）与内核包的 `Logger` 回调签名 |
 | `internal/locales/zh-Hans.json` / `en.json` | 界面文案（源语言 / 英文），`catalog_gen.go` 为 `go tool mygo generate` 生成物；见 `docs/dev-release.md` 的「界面文案（i18n）」 |
 | `internal/dhcp/packet.go` | 手写 BOOTP/DHCP 编解码（236 头 + cookie + TLV） |
-| `internal/dhcp/server.go` | DHCP / ProxyDHCP 应答、租约池、option 43/66/67 |
+| `internal/dhcp/` | DHCP / ProxyDHCP：`server.go` 生命周期与读循环、`dispatch.go` 报文分发与消息语义、`reply.go` 应答构造（option 43/66/67）、`transport.go` UDP 收发、`pool.go` 地址池与租约、`log.go` 日志级别与合并、`doc.go` 为文件地图 |
 | `internal/dhcp/broadcast_{windows,unix}.go` | `SO_BROADCAST` |
 | `internal/firewall/firewall_windows.go` | 防火墙策略：放行 / 撤销 / 状态 / 提示（`rule_` 规则、`elevate_` 提权、`marker_` 标记） |
 | `internal/firewall/firewall_other.go` | 非 Windows 的占位实现（`Supported()` 恒为假，界面因此隐藏防火墙那一段） |
@@ -25,7 +25,7 @@
 | `internal/priv/priv_{linux,other}.go` | 特权端口检测：Linux 读 `/proc/self/status` 的 `CapEff` 判 `CAP_NET_BIND_SERVICE`，其余平台恒真；界面据此提前提示并拦住「启动」 |
 | `internal/shell/shell_{windows,other}.go` | 用系统默认程序打开文件 |
 | `internal/tftp/server.go` | 只读 TFTP，blksize 1468 + tsize |
-| `internal/httpd/server.go` | HTTP 静态服务（wimboot / iPXE kernel / `/iso/`） |
+| `internal/httpd/` | HTTP 静态服务：`server.go` 生命周期与路由（wimboot / iPXE kernel）、`iso.go` 为 `/iso/` 路由、`index.go` 为目录索引页 |
 | `internal/isorom/iso.go` | ISO9660 只读视图（ISO 直连已剥离，仅余后端；见 `docs/scope.md`） |
 | `boot/menu.ipxe` | 示例 iPXE 菜单（**唯一入库**的 boot 文件） |
 | `Scripts/patch-packages.sh` | 打包期授权：给 PKGBUILD 追加 `install=pxeserver.install` 与 `post_install`，有工具时再给 deb 注入 `postinst`、给 rpm 重建 `%post`（缺 `dpkg-deb` / `rpmbuild` 就跳过）；由 `build.sh` / `build.ps1` 在出包后调用 |
