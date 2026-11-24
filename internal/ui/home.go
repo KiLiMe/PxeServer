@@ -1,14 +1,12 @@
+// 拆分点：主页布局（状态卡、启动/停止、特权提示条的装配）。
+// 引用方向：本文件 → iface.go / privilege.go；页面逻辑只调 app 的导出方法。
+
 package ui
 
 import (
-	"encoding/binary"
-	"net"
-
 	"github.com/egoist/mygo"
-	ui "github.com/egoist/mygo/ui"
-
+	"github.com/egoist/mygo/ui"
 	"pxeserv/internal/locales"
-	"pxeserv/internal/netif"
 )
 
 // home 是「主页」：服务、网络与启动参数，日常调参都在这一页。
@@ -110,154 +108,4 @@ func (u *UI) home(c *ui.Context) {
 		row(c, sf(c, locales.Option66(), &u.cfg.BootServerHost), sf(c, locales.Option67(), &u.cfg.BootFileOption), sf(c, locales.Option252(), &u.cfg.PrivateOption))
 		field(c, locales.ExtraOptions(), &u.cfg.ExtraOptions)
 	})
-}
-
-// grantPrivileges 走 pkexec 让用户在一次系统认证里完成授权：setcap 打在当前可执行文件上，
-// 之后普通用户启动就能绑 67/69。当前进程的 CapEff 不会因此改变，所以只把提示切成
-// 「重启后生效」，不动 privilegedOK——否则下一句「启动」就会撞回 bind 失败。
-func (u *UI) grantPrivileges() {
-	u.async(func() result {
-		if msg := u.app.GrantPrivilegedPorts(); msg != "" {
-			return failed(msg)
-		}
-		return notice(locales.PrivilegedGranted(), func() { u.privilegedGranted = true })
-	})
-}
-
-// copySetcapHint 把手工命令放进剪贴板：没装 polkit（SSH、精简桌面）时
-// 「一键授权」不可用，用户至少要能一键拿到命令去终端里贴。
-func (u *UI) copySetcapHint() {
-	mygo.Clipboard.WriteText(u.setcapHint())
-	u.setMsg(msgSuccess, locales.PrivilegedCopyCmdDone())
-}
-
-// restartApp 先存配置再替换进程：重启会丢掉界面上没保存的编辑，
-// 而 setcap 只有下一次 exec 才生效。成功后进程已被新镜像替换，不会返回。
-func (u *UI) restartApp() {
-	cfg := u.cfg.Clone()
-	u.async(func() result {
-		if msg := u.app.SaveConfig(*cfg); msg != "" {
-			return failed(msg)
-		}
-		if err := u.app.Restart(); err != nil {
-			return failed(locales.PrivilegedRestartFailed(err.Error()))
-		}
-		return done(nil)
-	})
-}
-
-// ifaceLabel 是网卡在下拉里的显示名：没有链路的网卡照样列出、照样可选，
-// 但在后面标注「未连接」，免得把没插网线的适配器当成能用的那个。
-// 没配 IPv4 时不能拼成「名字 ·」（尾巴挂个空分隔符），改标注「无 IPv4」。
-func ifaceLabel(i netif.Iface) string {
-	label := i.Name
-	if i.IP != "" {
-		label += " · " + i.IP
-	}
-	switch {
-	case !i.Up:
-		label += "（" + locales.IfaceDown() + "）"
-	case i.IP == "":
-		label += "（" + locales.IfaceNoAddr() + "）"
-	}
-	return label
-}
-
-func (u *UI) findIface() *netif.Iface {
-	for j := range u.ifaces {
-		if ifaceLabel(u.ifaces[j]) == u.iface {
-			return &u.ifaces[j]
-		}
-	}
-	return nil
-}
-
-// syncIface 让下拉与「服务器 IP」保持一致：选了真实网卡就跟着走，否则回到「手动填写」。
-func (u *UI) syncIface() {
-	if u.iface != "" && u.iface != u.manualLabel() {
-		return
-	}
-	u.iface = u.manualLabel()
-	for _, i := range u.ifaces {
-		if i.IP == u.cfg.ServerIP {
-			u.iface = ifaceLabel(i)
-			return
-		}
-	}
-}
-
-func (u *UI) detectInterface() {
-	u.async(func() result {
-		ip := u.app.DetectIP()
-		ifaces := u.app.ListInterfaces()
-		return done(func() {
-			selected := u.iface
-			u.ifaces = ifaces
-			for _, i := range u.ifaces {
-				if i.IP == ip {
-					u.applyIface(i)
-					return
-				}
-			}
-			u.iface = selected
-			u.setMsg(msgError, locales.IfaceNotFound())
-		})
-	})
-}
-
-func (u *UI) applyIface(i netif.Iface) {
-	ip := net.ParseIP(i.IP).To4()
-	maskIP := net.ParseIP(i.Mask).To4()
-	if ip == nil || maskIP == nil {
-		u.setMsg(msgError, locales.IfaceNoIPv4())
-		u.syncIface()
-		return
-	}
-	old := u.cfg.ServerIP
-	u.cfg.ServerIP = i.IP
-	u.cfg.SubnetMask = i.Mask
-	u.cfg.Broadcast = i.Broadcast
-	if u.cfg.NextServer == "" || u.cfg.NextServer == old {
-		u.cfg.NextServer = i.IP
-	}
-	if u.cfg.Router == old {
-		u.cfg.Router = i.IP
-	}
-	if u.cfg.DNS == old {
-		u.cfg.DNS = i.IP
-	}
-	network := net.IPNet{IP: ip.Mask(net.IPMask(maskIP)), Mask: net.IPMask(maskIP)}
-	pool := net.ParseIP(u.cfg.PoolStart)
-	if pool == nil || !network.Contains(pool) {
-		// 地址池默认从网关地址往后的第一个地址开始；撞上服务器自己就再挪一位。
-		candidate := ipAdd(network.IP, 2)
-		if candidate.Equal(ip) {
-			candidate = ipAdd(network.IP, 3)
-		}
-		if network.Contains(candidate) && candidate.String() != i.Broadcast {
-			u.cfg.PoolStart = candidate.String()
-		}
-	}
-	u.syncIface()
-	u.setMsg(msgSuccess, locales.IfaceApplied(i.Name))
-}
-
-// manualLabel 是「手动填写」在界面语言里的写法：网卡下拉没有选中真实网卡时的取值。
-func (u *UI) manualLabel() string { return locales.ManualEntry() }
-
-// ipAdd 把 IPv4 地址往后数 n 个（按 32 位整数进位，溢出回绕）。
-func ipAdd(ip net.IP, n int) net.IP {
-	out := make(net.IP, net.IPv4len)
-	binary.BigEndian.PutUint32(out, binary.BigEndian.Uint32(ip.To4())+uint32(n))
-	return out
-}
-
-// setcapHint 返回给用户直接抄的一条命令：路径取当前可执行文件，
-// 取不到时写成占位，用户至少知道该填什么。
-func (u *UI) setcapHint() string {
-	exe := u.app.ExecutablePath()
-	if exe == "" {
-		exe = "<pxeserver 的路径>"
-	}
-	return "sudo setcap 'cap_net_bind_service=+ep' " + exe
 }

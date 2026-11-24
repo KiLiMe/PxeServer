@@ -1,24 +1,19 @@
+// 拆分点：界面外壳（状态、选项卡顺序、异步调度入口、顶层视图装配）。
+// 引用方向：本文件 → action.go（提交结果）与 widget.go（通用控件），单向；只调 app 的导出方法。
+// 按需阅读：加一个页面就改这里的分发 + 新建一个页面文件。
+
 package ui
 
 import (
-	"encoding/json"
 	"strconv"
 	"sync"
 
 	"github.com/egoist/mygo"
-	ui "github.com/egoist/mygo/ui"
-
+	"github.com/egoist/mygo/ui"
 	"pxeserv/internal/app"
 	"pxeserv/internal/config"
 	"pxeserv/internal/locales"
 	"pxeserv/internal/netif"
-)
-
-const (
-	msgInfo = iota
-	msgSuccess
-	msgWarn
-	msgError
 )
 
 // 选项卡顺序与视图里 Segmented 的参数一一对应；调整顺序时两处一起改。
@@ -77,44 +72,6 @@ func (u *UI) adoptConfig() {
 	u.port = strconv.Itoa(u.cfg.HTTPPort)
 	u.poolSize = strconv.Itoa(u.cfg.PoolSize)
 	u.leaseTime = strconv.FormatUint(uint64(u.cfg.LeaseTime), 10)
-}
-
-// result 是一次异步任务的产物：级别、提示文案，以及回到界面线程后的收尾动作。
-// silent 表示只做收尾、不弹提示（例如进入设置页时的防火墙静默刷新）。
-type result struct {
-	kind   int
-	text   string
-	silent bool
-	apply  func()
-}
-
-func ok(text string, apply func()) result     { return result{kind: msgSuccess, text: text, apply: apply} }
-func notice(text string, apply func()) result { return result{kind: msgInfo, text: text, apply: apply} }
-func failed(text string) result               { return result{kind: msgError, text: text} }
-func done(apply func()) result                { return ok(locales.Done(), apply) }
-func silent(apply func()) result              { return result{silent: true, apply: apply} }
-
-func (u *UI) async(fn func() result) {
-	if u.busy {
-		return
-	}
-	u.busy = true
-	u.tasks.Add(1)
-	u.Win.Invalidate()
-	go func() {
-		defer u.tasks.Done()
-		res := fn()
-		u.Win.Update(func() {
-			u.busy = false
-			if !res.silent {
-				u.setMsg(res.kind, res.text)
-			}
-			if res.apply != nil {
-				res.apply()
-			}
-			u.Win.Invalidate()
-		})
-	}()
 }
 
 func (u *UI) Load() {
@@ -201,111 +158,6 @@ func (u *UI) View(c *ui.Context) {
 		})
 	})
 	u.toastViewport(c)
-}
-
-// hintBox 是页面里的内联提示条（不是浮动通知），配色与 Toast 共用一张表。
-func hintBox(c *ui.Context, text string, kind int) {
-	hintBoxActions(c, text, kind)
-}
-
-// hintAction 是提示条右侧的补救按钮：把文案里的一步做成可点的。
-type hintAction struct {
-	label string
-	on    func()
-}
-
-// hintBoxActions 是带补救按钮的提示条（按钮最多两个，多了挤不下）。
-// 文案要短：长解释留给弹框与文档，提示条只留一句结论。
-func hintBoxActions(c *ui.Context, text string, kind int, actions ...hintAction) {
-	bg, border := toastColors(toastType(kind))
-	ui.Row(c).FillWidth().Padding(8).Radius(6).Gap(10).AlignItems(ui.Center).Background(bg).Border(1, border).Children(func() {
-		ui.Text(c, text).Wrap().Grow(1)
-		for _, a := range actions {
-			ui.Button(c, a.label).OnClick(a.on)
-		}
-	})
-}
-
-func statusText(s app.Status) string {
-	if s.Running {
-		return locales.StatusRunning(s.ServerIP)
-	}
-	return locales.StatusStopped()
-}
-
-func section(c *ui.Context, title string, fn func()) {
-	t := c.Theme()
-	ui.Column(c).FillWidth().Padding(14).Gap(10).Radius(8).Background(t.Surface).Border(1, t.Border).Children(func() { ui.Text(c, title).FontSize(15).Bold(); fn() })
-}
-func field(c *ui.Context, label string, v *string) {
-	ui.Column(c).Gap(4).Children(func() { ui.Text(c, label).FontSize(12); ui.TextInput(c, v).Height(32) })
-}
-func row(c *ui.Context, fs ...func()) {
-	ui.Row(c).Gap(10).Children(func() {
-		for _, f := range fs {
-			ui.Column(c).Grow(1).Basis(0).MinWidth(0).Children(f)
-		}
-	})
-}
-func sf(c *ui.Context, l string, p *string) func() { return func() { field(c, l, p) } }
-
-func (u *UI) draftKey() string {
-	b, _ := json.Marshal(struct {
-		Config            config.Config
-		Port, Pool, Lease string
-	}{u.cfg, u.port, u.poolSize, u.leaseTime})
-	return string(b)
-}
-func (u *UI) dirty() bool { return u.savedKey != u.draftKey() }
-
-func (u *UI) saveAndStart(start bool) {
-	var err error
-	if u.cfg.HTTPPort, err = strconv.Atoi(u.port); err != nil {
-		u.setMsg(msgError, locales.HttpPortNotInt())
-		return
-	}
-	if u.cfg.PoolSize, err = strconv.Atoi(u.poolSize); err != nil {
-		u.setMsg(msgError, locales.PoolSizeNotInt())
-		return
-	}
-	lease, err := strconv.ParseUint(u.leaseTime, 10, 32)
-	if err != nil {
-		u.setMsg(msgError, locales.LeaseNotNumber())
-		return
-	}
-	u.cfg.LeaseTime = uint32(lease)
-	draft := u.cfg.Clone()
-	privilegedOK, setcap := u.privilegedOK, u.setcapHint()
-	u.async(func() result {
-		if saveMsg := u.app.SaveConfig(*draft); saveMsg != "" {
-			return failed(saveMsg)
-		}
-		apply := func() {
-			u.adoptConfig()
-			u.savedKey = u.draftKey()
-			if !u.menuDirty() {
-				u.menuLoaded = false
-				u.menuPath = ""
-				u.menuSaved = ""
-			}
-			u.ifaces = u.app.ListInterfaces()
-			u.syncIface()
-			u.Refresh()
-		}
-		if !start {
-			return ok(locales.ConfigSavedApplied(), apply)
-		}
-		if !privilegedOK {
-			// 配置已经存下来了，但服务一定会因为绑不上 67/69 而失败；
-			// 这里直接拦下并给出可复制的 setcap 命令，比让用户看日志里的 bind 失败强。
-			u.app.Warnf("服务未启动：当前进程没有绑定特权端口的权限（setcap / sudo / AmbientCapabilities）")
-			return result{kind: msgError, text: locales.PrivilegedPortBlocked(setcap), apply: apply}
-		}
-		if startMsg := u.app.StartServices(); startMsg != "" {
-			return result{kind: msgError, text: locales.SavedNotStarted(startMsg), apply: apply}
-		}
-		return ok(locales.SavedStarted(), apply)
-	})
 }
 
 // Wait 等界面线程排队的异步任务收尾，避免退出时丢日志。
