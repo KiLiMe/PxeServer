@@ -17,9 +17,6 @@ import (
 	"pxeserv/internal/logbook"
 )
 
-// Logf 是日志回调，由调用方决定输出到控制台还是推送到界面。
-type Logf = logbook.Logger
-
 // Server 是 DHCP / ProxyDHCP 服务端。
 type Server struct {
 	cfg    *config.Config
@@ -43,10 +40,12 @@ type Server struct {
 	wg       sync.WaitGroup
 }
 
-func New(cfg *config.Config, logf Logf) *Server {
+// New 构造服务端。cfg 必须已经过 Normalize：NextServer 已落成实际值，应答直接取用。
+// MenuFile / ClassID 例外——空串有含义（不下发菜单、用默认厂商类），判定留在应答构造里。
+func New(cfg *config.Config, logger logbook.Logger) *Server {
 	return &Server{
 		cfg:        cfg,
-		logger:     logf,
+		logger:     logbook.Or(logger),
 		leases:     make(map[string]*lease),
 		byIP:       make(map[string]string),
 		quarantine: make(map[string]time.Time),
@@ -71,7 +70,7 @@ func (s *Server) Start() error {
 	// 额外选项只在启动时解析一次；写错不影响启动，只是忽略并提示。
 	s.extra = make(map[byte][]byte)
 	if extra, err := s.cfg.ParseExtraOptions(); err != nil {
-		s.logf(logbook.Warn, "DHCPd：额外选项无效，已忽略：%v", err)
+		s.logger(logbook.Warn, "DHCPd：额外选项无效，已忽略：%v", err)
 	} else if len(extra) > 0 {
 		s.extra = extra
 		codes := make([]string, 0, len(extra))
@@ -79,7 +78,7 @@ func (s *Server) Start() error {
 			codes = append(codes, strconv.Itoa(int(code)))
 		}
 		sort.Strings(codes)
-		s.logf(logbook.Info, "DHCPd：额外选项已生效：option %s", strings.Join(codes, ", "))
+		s.logger(logbook.Info, "DHCPd：额外选项已生效：option %s", strings.Join(codes, ", "))
 	}
 	// 启动信息在 4011 绑完之后合成一行：监听地址、模式、地址池、广播目标、4011 是否就绪。
 	// 这几条原本各占一行，每次启停都重复一遍，把真正有价值的包级日志挤到看不见的地方。
@@ -97,7 +96,7 @@ func (s *Server) Start() error {
 	{
 		boot, err := s.bindService("4011")
 		if err != nil {
-			s.logf(logbook.Warn, "DHCPd：PXE 启动服务 udp:4011 绑定失败（部分客户端会改走 67 应答）: %v", err)
+			s.logger(logbook.Warn, "DHCPd：PXE 启动服务 udp:4011 绑定失败（部分客户端会改走 67 应答）: %v", err)
 		} else {
 			s.bootConn = boot
 			s.wg.Add(1)
@@ -105,9 +104,9 @@ func (s *Server) Start() error {
 		}
 	}
 
-	s.logf(logbook.Info, "%s", startupSummary(conn.LocalAddr(), mode, s.cfg.PoolStart, s.cfg.PoolSize, dests, s.bootConn != nil))
+	s.logger(logbook.Info, "%s", startupSummary(conn.LocalAddr(), mode, s.cfg.PoolStart, s.cfg.PoolSize, dests, s.bootConn != nil))
 	if s.cfg.ProxyDHCP {
-		s.logf(logbook.Warn, "DHCPd：ProxyDHCP 只补 PXE 启动信息、不分配 IP；本网段若没有其他 DHCP 服务器，客户端会一直停在 DHCPDISCOVER（在设置里取消 ProxyDHCP 即改为自己发 IP）")
+		s.logger(logbook.Warn, "DHCPd：ProxyDHCP 只补 PXE 启动信息、不分配 IP；本网段若没有其他 DHCP 服务器，客户端会一直停在 DHCPDISCOVER（在设置里取消 ProxyDHCP 即改为自己发 IP）")
 	}
 	// 后台定期清理过期租约：界面没在轮询、也没有新客户端时，过期条目不该一直占着内存。
 	s.wg.Add(1)
@@ -145,7 +144,7 @@ func (s *Server) Stop() {
 		s.bootConn.Close()
 	}
 	s.wg.Wait()
-	s.logf(logbook.Info, "DHCPd：已停止")
+	s.logger(logbook.Info, "DHCPd：已停止")
 }
 
 func (s *Server) loop(conn *net.UDPConn, onBootService bool) {
@@ -159,7 +158,7 @@ func (s *Server) loop(conn *net.UDPConn, onBootService bool) {
 				return
 			default:
 			}
-			s.logf(logbook.Error, "DHCPd：读取失败: %v", err)
+			s.logger(logbook.Error, "DHCPd：读取失败: %v", err)
 			continue
 		}
 		pkt, err := Parse(buf[:n])

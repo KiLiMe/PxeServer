@@ -22,7 +22,7 @@ func (a *App) dbgLogs(w http.ResponseWriter, r *http.Request) {
 
 // dbgSelfTest 不需要联网、不占端口：构造一个 UEFI x64 的 DISCOVER 走一遍编解码。
 func (a *App) dbgSelfTest(w http.ResponseWriter) {
-	cfg := a.snapshot()
+	cfg := a.GetConfig()
 	p := &dhcp.Packet{Op: 1, HType: 1, HLen: 6, XID: 0x5eed1234, Flags: 0x8000}
 	copy(p.CHAddr[:], []byte{0x52, 0x54, 0x00, 0x12, 0x34, 0x56})
 	p.SetByte(dhcp.OptMessageType, dhcp.Discover)

@@ -39,10 +39,7 @@ type Mount struct {
 }
 
 func New(root string, port int, logger logbook.Logger) *Server {
-	if logger == nil {
-		logger = func(logbook.Level, string, ...any) {}
-	}
-	s := &Server{Root: root, Port: port, logger: logger}
+	s := &Server{Root: root, Port: port, logger: logbook.Or(logger)}
 	fs := http.FileServer(noDirListing{http.Dir(root)})
 	h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
@@ -53,21 +50,16 @@ func New(root string, port int, logger logbook.Logger) *Server {
 		case r.URL.Path == "/" && (r.Method == http.MethodGet || r.Method == http.MethodHead):
 			// 根目录给一个人能看的首页（正版 TinyPXE 也是这么做的），
 			// 子目录仍然 404，不做可枚举的文件服务器。
-			s.serveIndex(rec, r)
+			s.serveIndex(rec)
 		default:
 			fs.ServeHTTP(rec, r)
 		}
 		// 只写路径会让“文件不存在”和“传输成功”在日志里长得一模一样，所以带上状态码。
-		s.logf(statusLevel(rec.status), "HTTPd：%s %s -> %d（%s，%s）", r.Method, r.URL.Path, rec.status,
+		s.logger(statusLevel(rec.status), "HTTPd：%s %s -> %d（%s，%s）", r.Method, r.URL.Path, rec.status,
 			time.Since(start).Round(time.Millisecond), r.RemoteAddr)
 	})
 	s.srv = &http.Server{Addr: fmt.Sprintf(":%d", port), Handler: h, ReadHeaderTimeout: 10 * time.Second}
 	return s
-}
-
-// logf 统一出口：级别由调用点标注，落盘与筛选归上层。
-func (s *Server) logf(level logbook.Level, format string, args ...any) {
-	s.logger(level, format, args...)
 }
 
 // statusLevel 把 HTTP 状态码映射成级别：4xx/5xx 值得一看，其余只是进度。
@@ -99,16 +91,12 @@ func (s *Server) Serve() error {
 	if err := s.Listen(); err != nil {
 		return err
 	}
-	s.logf(logbook.Info, "HTTPd：http://0.0.0.0:%d → %s", s.Port, s.Root)
+	s.logger(logbook.Info, "HTTPd：http://0.0.0.0:%d → %s", s.Port, s.Root)
 	err := s.srv.Serve(s.ln)
 	if err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return err
 	}
 	return nil
-}
-
-func (s *Server) Start() error {
-	return s.Serve()
 }
 
 // statusRecorder 记住 http.FileServer 真正写出的状态码，供访问日志使用。

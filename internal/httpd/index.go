@@ -1,4 +1,4 @@
-// 拆分点：/ 路由——目录索引页与体积格式化，禁止列目录的包装。
+// 拆分点：/ 路由——目录索引页与体积展示，禁止列目录的包装。
 // 引用方向：server.go 的路由表 → 本文件。本文件不碰 ISO。
 
 package httpd
@@ -10,14 +10,16 @@ import (
 	"os"
 	"path"
 	"strings"
+
+	"pxeserv/internal/human"
 )
 
 // serveIndex 在 / 上输出一个简单首页：当前共享了哪些启动文件、挂了哪些 ISO。
 // 这不是目录列表（子目录仍然 404），只是给人一个“服务是不是活着”的落脚点。
-func (s *Server) serveIndex(w http.ResponseWriter, r *http.Request) {
+func (s *Server) serveIndex(w http.ResponseWriter) {
 	type entry struct {
 		Name string
-		Size string
+		Size int64 // 目录没有意义，看 Dir
 		Dir  bool
 	}
 	var files []entry
@@ -27,10 +29,8 @@ func (s *Server) serveIndex(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 			e := entry{Name: de.Name(), Dir: de.IsDir()}
-			if de.IsDir() {
-				e.Size = "目录"
-			} else if fi, err := de.Info(); err == nil {
-				e.Size = humanSize(fi.Size())
+			if fi, err := de.Info(); err == nil {
+				e.Size = fi.Size()
 			}
 			files = append(files, e)
 		}
@@ -53,11 +53,11 @@ func (s *Server) serveIndex(w http.ResponseWriter, r *http.Request) {
 	b.WriteString("<h2>启动文件</h2><table>")
 	for _, f := range files {
 		if f.Dir {
-			fmt.Fprintf(&b, "<tr><td>%s/</td><td class=\"muted\">%s</td></tr>", htmlEscape(f.Name), f.Size)
+			fmt.Fprintf(&b, "<tr><td>%s/</td><td class=\"muted\">目录</td></tr>", htmlEscape(f.Name))
 			continue
 		}
 		fmt.Fprintf(&b, "<tr><td><a href=\"/%s\">/%s</a></td><td class=\"muted\">%s</td></tr>",
-			url.PathEscape(f.Name), htmlEscape(f.Name), f.Size)
+			url.PathEscape(f.Name), htmlEscape(f.Name), human.Bytes(f.Size))
 	}
 	b.WriteString("</table>")
 
@@ -72,7 +72,7 @@ func (s *Server) serveIndex(w http.ResponseWriter, r *http.Request) {
 				label = path.Base(m.Img.Path())
 			}
 			fmt.Fprintf(&b, "<tr><td>%s</td><td class=\"muted\">卷标 %s，%s</td></tr>",
-				htmlEscape(label), htmlEscape(m.Img.Label()), humanSize(m.Img.Size()))
+				htmlEscape(label), htmlEscape(m.Img.Label()), human.Bytes(m.Img.Size()))
 		}
 		b.WriteString("</table>")
 	}
@@ -81,20 +81,6 @@ func (s *Server) serveIndex(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_, _ = w.Write([]byte(b.String()))
-}
-
-// humanSize 把字节数换成便于阅读的单位。
-func humanSize(n int64) string {
-	const unit = 1024
-	if n < unit {
-		return fmt.Sprintf("%d B", n)
-	}
-	div, exp := int64(unit), 0
-	for n/div >= unit && exp < 3 {
-		div *= unit
-		exp++
-	}
-	return fmt.Sprintf("%.1f %cB", float64(n)/float64(div), "KMGT"[exp])
 }
 
 func htmlEscape(s string) string {

@@ -8,6 +8,7 @@ import (
 	"net"
 
 	"pxeserv/internal/locales"
+	"pxeserv/internal/netaddr"
 )
 
 // Normalize 填充自动探测项并校验所有地址。
@@ -95,10 +96,10 @@ func (c *Config) Normalize() error {
 		srv := net.ParseIP(c.ServerIP).To4()
 		start := net.ParseIP(c.PoolStart).To4()
 		if srv != nil && start != nil && maskIP != nil {
-			maskU := ipToU32(maskIP)
-			netU := ipToU32(srv) & maskU
+			maskU := netaddr.ToU32(maskIP)
+			netU := netaddr.ToU32(srv) & maskU
 			bcastU := netU | ^maskU
-			startU := ipToU32(start)
+			startU := netaddr.ToU32(start)
 			if (startU & maskU) != netU {
 				return errors.New(locales.ErrPoolSubnet(c.PoolStart, c.ServerIP, c.SubnetMask))
 			}
@@ -111,10 +112,7 @@ func (c *Config) Normalize() error {
 			}
 		}
 		for _, reserved := range []string{c.ServerIP, c.Router} {
-			if reserved == "" {
-				continue
-			}
-			if ip := net.ParseIP(reserved).To4(); ip != nil && start != nil && inPool(start, c.PoolSize, ip) {
+			if ip := net.ParseIP(reserved).To4(); ip != nil && netaddr.InRange(start, c.PoolSize, ip) {
 				return errors.New(locales.ErrPoolReserved(reserved))
 			}
 		}

@@ -28,11 +28,11 @@ func (s *Server) reply(c *net.UDPConn, req *Packet, from *net.UDPAddr, msgType b
 	}
 	cfg := s.cfg
 	serverIP := net.ParseIP(cfg.ServerIP).To4()
-	next := cfg.NextServer
-	if next == "" {
-		next = cfg.ServerIP
+	nextServer := cfg.NextServer
+	if nextServer == "" {
+		nextServer = cfg.ServerIP
 	}
-	nextIP := net.ParseIP(next).To4()
+	nextIP := net.ParseIP(nextServer).To4()
 	mac := req.ClientMAC().String()
 
 	// 启动文件名：架构表 -> Option 67 覆盖值；开启"仅 gPXE/iPXE"时对传统 PXE ROM 不发文件名。
@@ -48,11 +48,10 @@ func (s *Server) reply(c *net.UDPConn, req *Packet, from *net.UDPAddr, msgType b
 		// 用「完整 URL」把菜单下发出去：iPXE 会把脚本自身的 URI 当成工作目录，
 		// 于是菜单里直接写相对路径（/wimboot、/wim-boot/bcd）就能自动落到同一个
 		// 服务器和端口上，菜单文件里不用再写一遍端口（端口改了也不用改菜单）。
+		// 与 pxe.MenuURL 的差别是刻意的：这里必须拿到字面 IP，主机名交给固件解析不可靠；
+		// 那一个用于写菜单与调试输出，允许主机名。改任一处前先看另一处。
 		if cfg.HTTPEnable && cfg.HTTPPort > 0 {
-			host := cfg.BootServerHost
-			if host == "" {
-				host = next
-			}
+			host := cfg.BootHost()
 			if host != "" && net.ParseIP(host) != nil {
 				menu := strings.TrimPrefix(cfg.MenuFile, "/")
 				// 默认端口（80）不写出来：http://192.168.5.1/menu.ipxe 看着跟正版一样清爽。
@@ -66,11 +65,8 @@ func (s *Server) reply(c *net.UDPConn, req *Packet, from *net.UDPAddr, msgType b
 	} else if cfg.FilterUserClass && !req.IsIPXE() {
 		bootFile = ""
 	}
-	// next-server：Option 66 有覆盖值就优先用它。
-	bootServer := cfg.BootServerHost
-	if bootServer == "" {
-		bootServer = next
-	}
+	// next-server：Option 66 取「引导服务器」回落链的同一结果。
+	bootServer := cfg.BootHost()
 	// 只有真正的 PXE 客户端（带 option 60 或 option 93）才该收到启动文件与启动服务器。
 	// 否则像 WinPE 自己的 DHCP 客户端也会被塞一个 bootfile，虽然一般被忽略，但会污染日志、
 	// 也可能让某些严格的 DHCP 客户端困惑。

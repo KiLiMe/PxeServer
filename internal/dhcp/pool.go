@@ -8,6 +8,8 @@ import (
 	"net"
 	"sort"
 	"time"
+
+	"pxeserv/internal/netaddr"
 )
 
 // quarantinePeriod 是地址被客户端声明冲突（DECLINE）后的隔离时长，
@@ -29,7 +31,7 @@ func (s *Server) requestUnusable(mac string, ip net.IP) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.sweepLocked()
-	if !s.poolContains(ip4) || s.reserved(ip4) {
+	if !s.poolContains(ip4) || s.cfg.IsReserved(ip4) {
 		return true
 	}
 	if owner, taken := s.byIP[ip4.String()]; taken && owner != mac {
@@ -46,18 +48,6 @@ func (s *Server) baseIP() net.IP {
 	return ip
 }
 
-func ipToU32(ip net.IP) uint32 {
-	ip4 := ip.To4()
-	if ip4 == nil {
-		return 0
-	}
-	return uint32(ip4[0])<<24 | uint32(ip4[1])<<16 | uint32(ip4[2])<<8 | uint32(ip4[3])
-}
-
-func u32ToIP(v uint32) net.IP {
-	return net.IPv4(byte(v>>24), byte(v>>16), byte(v>>8), byte(v)).To4()
-}
-
 // poolRange 返回地址池的有效主机范围 [startU, endU]（已排除网络号和广播地址）。
 func (s *Server) poolRange() (startU, endU uint64, ok bool) {
 	base := s.baseIP()
@@ -68,8 +58,8 @@ func (s *Server) poolRange() (startU, endU uint64, ok bool) {
 	if maskIP == nil {
 		maskIP = net.IPv4(255, 255, 255, 0).To4()
 	}
-	maskU := ipToU32(maskIP)
-	sU := ipToU32(base)
+	maskU := netaddr.ToU32(maskIP)
+	sU := netaddr.ToU32(base)
 	netU := sU & maskU
 	bcastU := netU | ^maskU
 	if sU <= netU || sU >= bcastU {
@@ -88,24 +78,11 @@ func (s *Server) poolContains(ip net.IP) bool {
 	if !ok || ip4 == nil {
 		return false
 	}
-	v := uint64(ipToU32(ip4))
+	v := uint64(netaddr.ToU32(ip4))
 	if v < startU || v > endU {
 		return false
 	}
-	return !s.reserved(ip4)
-}
-
-// reserved 判断该地址是否被服务器自己或网关占用，绝不会分配给客户端。
-func (s *Server) reserved(ip net.IP) bool {
-	for _, v := range []string{s.cfg.ServerIP, s.cfg.Router} {
-		if v == "" {
-			continue
-		}
-		if own := net.ParseIP(v).To4(); own != nil && own.Equal(ip.To4()) {
-			return true
-		}
-	}
-	return false
+	return !s.cfg.IsReserved(ip4)
 }
 
 // alloc 返回应当分配给该 MAC 的地址；失败说明池子已满。
@@ -124,7 +101,7 @@ func (s *Server) alloc(mac string, requested net.IP) (net.IP, bool) {
 	if requested != nil && s.poolContains(requested) {
 		owner, taken := s.byIP[requested.String()]
 		until, bad := s.quarantine[requested.String()]
-		if (!taken || owner == mac) && (!bad || now.After(until)) && !s.reserved(requested) {
+		if (!taken || owner == mac) && (!bad || now.After(until)) && !s.cfg.IsReserved(requested) {
 			s.bindLocked(mac, requested, now.Add(ttl))
 			return requested, true
 		}
@@ -138,8 +115,8 @@ func (s *Server) alloc(mac string, requested net.IP) (net.IP, bool) {
 		return nil, false
 	}
 	for v := startU; v <= endU; v++ {
-		ip := u32ToIP(uint32(v))
-		if s.reserved(ip) {
+		ip := netaddr.FromU32(uint32(v))
+		if s.cfg.IsReserved(ip) {
 			continue
 		}
 		if _, taken := s.byIP[ip.String()]; taken {

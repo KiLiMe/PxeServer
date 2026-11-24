@@ -35,10 +35,9 @@ type Services struct {
 }
 
 // Start 在 DHCP 开始应答前绑定文件服务的端口并准备菜单。
+// cfg 需已 Normalize（地址与端口的回落在那里完成）。
 func Start(cfg *config.Config, logf logbook.Logger) (*Services, *StartError) {
-	if logf == nil {
-		logf = func(logbook.Level, string, ...any) {}
-	}
+	logf = logbook.Or(logf)
 	if err := os.MkdirAll(cfg.TFTPRoot, 0o755); err != nil {
 		return nil, &StartError{BootRoot, err}
 	}

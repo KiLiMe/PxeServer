@@ -21,6 +21,14 @@ const (
 // Logger 是内核包向外写日志的统一签名。
 type Logger func(level Level, format string, args ...any)
 
+// Or 把 nil 换成不记录的实现：构造服务时不必各自再判一次空。
+func Or(l Logger) Logger {
+	if l == nil {
+		return func(Level, string, ...any) {}
+	}
+	return l
+}
+
 // Tag 返回单字符标记，落盘行与界面共用：I / W / E。
 func (l Level) Tag() string {
 	switch l {

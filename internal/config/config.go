@@ -1,10 +1,12 @@
 // 拆分点：配置数据结构本身（字段 = 界面控件）与默认值。
-// 依赖边界：本包只依赖 internal/locales（中文报错文案），绝不能被 app / ui 反向依赖。
+// 依赖边界：本包只依赖 internal/locales（中文报错文案）与 internal/netaddr（地址运算），
+// 绝不能被 app / ui 反向依赖。
 // 按需阅读：新增配置项改这里，再同步 internal/ui 对应页面与 normalize.go 的校验。
 
 package config
 
 import (
+	"net"
 	"strconv"
 )
 
@@ -119,4 +121,29 @@ func (c *Config) BootFileFor(arch uint16) string {
 		return f
 	}
 	return c.BootFile
+}
+
+// BootHost 是下发给客户端的服务器主机：显式设置优先，其次引导服务器（Option 66），
+// 最后才是本机地址。应答与菜单拼接都从这里取，两处各写一遍回落链必然漂移。
+func (c *Config) BootHost() string {
+	if c.BootServerHost != "" {
+		return c.BootServerHost
+	}
+	if c.NextServer != "" {
+		return c.NextServer
+	}
+	return c.ServerIP
+}
+
+// IsReserved 报告 ip 是不是服务器自己或网关：这两个地址永不分给客户端。
+func (c *Config) IsReserved(ip net.IP) bool {
+	for _, v := range []string{c.ServerIP, c.Router} {
+		if v == "" {
+			continue
+		}
+		if own := net.ParseIP(v).To4(); own != nil && own.Equal(ip.To4()) {
+			return true
+		}
+	}
+	return false
 }

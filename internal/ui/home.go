@@ -18,12 +18,12 @@ func (u *UI) home(c *ui.Context) {
 		case u.privilegedGranted:
 			// 授权只改了文件，能力要下一次 exec 才进 CapEff：这里直接给「立即重启」，
 			// 免得用户看完「重启后生效」还得自己关窗口、再去菜单里重新打开。
-			hintBoxActions(c, locales.PrivilegedGrantedHint(), msgSuccess,
+			hintBox(c, locales.PrivilegedGrantedHint(), msgSuccess,
 				hintAction{locales.PrivilegedRestart(), u.restartApp})
 		default:
 			// 提示条只留一句结论：三种解法的完整说明在「启动」被拦下的弹框里，
 			// 命令给一个「复制命令」按钮，SSH / 没有 polkit 的用户拿去终端贴。
-			hintBoxActions(c, locales.PrivilegedPortHint(), msgWarn,
+			hintBox(c, locales.PrivilegedPortHint(), msgWarn,
 				hintAction{locales.PrivilegedGrant(), u.grantPrivileges},
 				hintAction{locales.PrivilegedCopyCmd(), u.copySetcapHint})
 		}

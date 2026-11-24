@@ -1,7 +1,6 @@
 package ui
 
 import (
-	"net"
 	"strings"
 	"testing"
 
@@ -381,26 +380,6 @@ func TestToastAndBadge(t *testing.T) {
 	tt = ui.NewTester(u.View, 1000, 800)
 	if _, ok := tt.Find("保存失败"); !ok {
 		t.Fatal("错误 Toast 未出现在界面里")
-	}
-}
-
-func TestIPAdd(t *testing.T) {
-	cases := []struct {
-		name string
-		ip   string
-		n    int
-		want string
-	}{
-		{"网段起点加二", "192.168.100.0", 2, "192.168.100.2"},
-		{"撞上服务器再挪一位", "192.168.100.1", 3, "192.168.100.4"},
-		{"末位进位", "192.168.100.255", 1, "192.168.101.0"},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			if got := ipAdd(net.ParseIP(tc.ip), tc.n).String(); got != tc.want {
-				t.Fatalf("ipAdd(%s, %d) = %s，期望 %s", tc.ip, tc.n, got, tc.want)
-			}
-		})
 	}
 }
 

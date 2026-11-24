@@ -48,7 +48,7 @@ func (a *App) startDebugAPI() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/status", func(w http.ResponseWriter, r *http.Request) { writeJSON(w, a.Status()) })
 	mux.HandleFunc("/logs", a.dbgLogs)
-	mux.HandleFunc("/config", func(w http.ResponseWriter, r *http.Request) { writeJSON(w, a.snapshot()) })
+	mux.HandleFunc("/config", func(w http.ResponseWriter, r *http.Request) { writeJSON(w, a.GetConfig()) })
 	mux.HandleFunc("/start", func(w http.ResponseWriter, r *http.Request) {
 		if !postOnly(w, r) {
 			return

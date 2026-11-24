@@ -11,6 +11,7 @@ import (
 )
 
 // MenuURL 生成 iPXE 菜单的完整 URL（HTTP 启用且主机有效时返回 http://...，否则返回配置里的文件名）。
+// 与应答路径（internal/dhcp/reply.go）不同，这里不要求主机是字面 IP：它只用于写菜单与调试输出。
 func MenuURL(cfg *config.Config) string {
 	if cfg == nil {
 		return ""
@@ -22,13 +23,7 @@ func MenuURL(cfg *config.Config) string {
 	if !cfg.HTTPEnable || cfg.HTTPPort <= 0 {
 		return menu
 	}
-	host := cfg.BootServerHost
-	if host == "" {
-		host = cfg.NextServer
-	}
-	if host == "" {
-		host = cfg.ServerIP
-	}
+	host := cfg.BootHost()
 	if host == "" {
 		return menu
 	}

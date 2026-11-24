@@ -1,5 +1,5 @@
 // 拆分点：日志级别判定与「同一客户端 5 秒合并」策略。
-// 引用方向：全包 → 本文件（s.logf 是唯一出口）。本文件不依赖其它 dhcp 文件。
+// 引用方向：全包 → 本文件（级别与合并都在这）。本文件不依赖其它 dhcp 文件。
 // 按需阅读：日志刷屏或级别标错，只看这里 + internal/logbook。
 
 package dhcp
@@ -15,11 +15,6 @@ import (
 
 // burstWindow 是「同一客户端、同一结论」的日志合并窗口。
 const burstWindow = 5 * time.Second
-
-// logf 统一出口：级别由调用点标注，落盘与筛选归上层。
-func (s *Server) logf(level logbook.Level, format string, args ...any) {
-	s.logger(level, format, args...)
-}
 
 // packetLevel 给包头日志挑级别：地址池满、地址冲突这类“客户端拿不到地址”
 // 的结果值得标黄，正常一轮问答只是进度。
@@ -72,5 +67,5 @@ func (s *Server) logPacket(mac, msg string, arch uint16, onBootService bool, res
 	if n > 1 {
 		fmt.Fprintf(&b, "（同 MAC 第 %d 次）", n)
 	}
-	s.logf(packetLevel(result), "%s", b.String())
+	s.logger(packetLevel(result), "%s", b.String())
 }

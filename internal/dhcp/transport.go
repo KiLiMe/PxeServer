@@ -95,15 +95,15 @@ func (s *Server) send(c *net.UDPConn, r *Packet, from *net.UDPAddr) {
 			if err := s.network.write(c, payload, d); err == nil {
 				ok = true
 			} else {
-				s.logf(logbook.Error, "DHCPd：向 %s 发送应答失败：%v", d.IP, err)
+				s.logger(logbook.Error, "DHCPd：向 %s 发送应答失败：%v", d.IP, err)
 			}
 		}
 		if !ok {
-			s.logf(logbook.Warn, "DHCPd：广播应答发送失败")
+			s.logger(logbook.Warn, "DHCPd：广播应答发送失败")
 		}
 		return
 	}
 	if err := s.network.write(c, r.Marshal(), dst); err != nil {
-		s.logf(logbook.Error, "DHCPd：发送应答失败: %v", err)
+		s.logger(logbook.Error, "DHCPd：发送应答失败: %v", err)
 	}
 }

@@ -4,10 +4,10 @@
 package ui
 
 import (
-	"encoding/binary"
 	"net"
 
 	"pxeserv/internal/locales"
+	"pxeserv/internal/netaddr"
 	"pxeserv/internal/netif"
 )
 
@@ -95,9 +95,9 @@ func (u *UI) applyIface(i netif.Iface) {
 	pool := net.ParseIP(u.cfg.PoolStart)
 	if pool == nil || !network.Contains(pool) {
 		// 地址池默认从网关地址往后的第一个地址开始；撞上服务器自己就再挪一位。
-		candidate := ipAdd(network.IP, 2)
+		candidate := netaddr.Add(network.IP, 2)
 		if candidate.Equal(ip) {
-			candidate = ipAdd(network.IP, 3)
+			candidate = netaddr.Add(network.IP, 3)
 		}
 		if network.Contains(candidate) && candidate.String() != i.Broadcast {
 			u.cfg.PoolStart = candidate.String()
@@ -109,10 +109,3 @@ func (u *UI) applyIface(i netif.Iface) {
 
 // manualLabel 是「手动填写」在界面语言里的写法：网卡下拉没有选中真实网卡时的取值。
 func (u *UI) manualLabel() string { return locales.ManualEntry() }
-
-// ipAdd 把 IPv4 地址往后数 n 个（按 32 位整数进位，溢出回绕）。
-func ipAdd(ip net.IP, n int) net.IP {
-	out := make(net.IP, net.IPv4len)
-	binary.BigEndian.PutUint32(out, binary.BigEndian.Uint32(ip.To4())+uint32(n))
-	return out
-}

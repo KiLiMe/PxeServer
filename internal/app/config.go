@@ -74,10 +74,3 @@ func (a *App) SaveConfig(c config.Config) string {
 	}
 	return ""
 }
-
-// snapshot 返回当前配置指针（只读使用），配置为空时返回 nil。
-func (a *App) snapshot() *config.Config {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	return a.cfg
-}

@@ -20,7 +20,7 @@ func (a *App) dbgTFTP(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, map[string]any{"ok": false, "error": "缺少 file 参数"})
 		return
 	}
-	cfg := a.snapshot()
+	cfg := a.GetConfig()
 	if cfg == nil {
 		writeJSON(w, map[string]any{"ok": false, "error": "配置未加载"})
 		return
@@ -80,7 +80,7 @@ func (a *App) dbgTFTP(w http.ResponseWriter, r *http.Request) {
 
 // dbgHTTP 通过本机 HTTP 服务取一个文件，可选 Range。
 func (a *App) dbgHTTP(w http.ResponseWriter, r *http.Request) {
-	cfg := a.snapshot()
+	cfg := a.GetConfig()
 	if cfg == nil {
 		writeJSON(w, map[string]any{"ok": false, "error": "配置未加载"})
 		return
